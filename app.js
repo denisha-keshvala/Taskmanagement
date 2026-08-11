@@ -489,7 +489,12 @@ async function saveMember(e){
     document.getElementById('saveMemberBtn').textContent='Save Member';
   }catch(err){
     console.error('SAVE MEMBER ERROR',err);
-    toast(err.message||String(err));
+    const msg=String(err?.message||err||'Member could not be added.');
+    if(/gen_salt|add_employee/i.test(msg)){
+      toast('Member add database fix is required. Run FIX_MEMBER_ADD_GEN_SALT.sql in Supabase.');
+    }else{
+      toast(msg);
+    }
   }finally{if(btn)btn.disabled=false}
 }
 
