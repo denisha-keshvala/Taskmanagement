@@ -76,19 +76,67 @@ async function supabaseCall(action, payload = {}) {
 
     case 'createTask':
       rpcName = 'create_task';
+
+      // IMPORTANT:
+      // Supabase function signature:
+      // create_task(
+      //   p_employee_id text,
+      //   p_session_token text,
+      //   p_task_type text,
+      //   p_assigned_to text,
+      //   p_priority text,
+      //   p_deadline date,
+      //   p_reminder text,
+      //   p_description text,
+      //   p_file_url text,
+      //   p_department text,
+      //   p_follow_up text
+      // )
+
       params = {
-        p_employee_id: payload.employeeId || '',
-        p_session_token: payload.sessionToken || getSessionToken(),
-        p_task_type: payload.taskType || '',
-        p_assigned_to: payload.assignedTo || '',
-        p_priority: payload.priority || 'Medium',
-        p_deadline: payload.deadline || null,
-        p_reminder: payload.reminder || null,
-        p_description: payload.description || '',
-        p_file_url: payload.fileUrl || '',
-        p_department: payload.taskDepartment || payload.department || 'Other',
-        p_follow_up: payload.followUpTo || ''
+        p_employee_id: String(
+          payload.employeeId || APP.currentUser?.employeeId || ''
+        ),
+        p_session_token: String(
+          payload.sessionToken || getSessionToken() || ''
+        ),
+        p_task_type: String(
+          payload.taskType || payload.task_type || ''
+        ),
+        p_assigned_to: String(
+          payload.assignedTo || payload.assigned_to || ''
+        ),
+        p_priority: String(
+          payload.priority || 'Medium'
+        ),
+        p_deadline:
+          payload.deadline ||
+          payload.dueDate ||
+          payload.due_date ||
+          null,
+        p_reminder: String(
+          payload.reminder || ''
+        ),
+        p_description: String(
+          payload.description || ''
+        ),
+        p_file_url: String(
+          payload.fileUrl || payload.file_url || ''
+        ),
+        p_department: String(
+          payload.taskDepartment ||
+          payload.department ||
+          'Other'
+        ),
+        p_follow_up: String(
+          payload.followUpTo ||
+          payload.followUp ||
+          payload.follow_up ||
+          ''
+        )
       };
+
+      console.log('CREATE TASK RPC:', params);
       break;
 
     case 'createAnnouncement':
@@ -168,9 +216,9 @@ async function uploadFile(file, action, nameOverride) {
     throw new Error('File is larger than 8 MB.');
   }
 
-  if (action === 'uploadPhoto' && !isOwner()) {
-    throw new Error('Only the Owner can change profile photos.');
-  }
+  // Owner and Employee can both change their own profile photo.
+  // The database/storage policy should still restrict the path to the
+  // currently logged-in user.
 
   const bucket = action === 'uploadPhoto' ? 'avatars' : 'task-attachments';
   const safeName = String(nameOverride || file.name || 'file')
@@ -475,7 +523,7 @@ function closeProfileModal(){document.getElementById('profileModal').classList.r
 function toggleProfileEdit(){const p=document.getElementById('profileEditPanel');p.style.display=p.style.display==='none'?'block':'none';const m=APP.currentUser;if(m){document.getElementById('editProfileName').value=m.name;document.getElementById('editProfileRole').value=m.role;document.getElementById('editProfilePhone').value=m.phone;document.getElementById('editProfileEmail').value=m.email}}
 function closeProfileEdit(){document.getElementById('profileEditPanel').style.display='none'}
 async function saveProfileChanges(){const m=APP.currentUser;if(!m)return;try{const res=await api('updateOwnProfile',{employeeId:m.employeeId,role:m.role,phone:document.getElementById('editProfilePhone').value.trim(),email:document.getElementById('editProfileEmail').value.trim(),photo:m.photo||''});APP.currentUser=res.member;APP.members=APP.members.map(x=>x.employeeId===m.employeeId?res.member:x);updateProfileUI();closeProfileEdit();toast('Profile updated')}catch(e){toast(e.message||e)}}
-async function uploadProfilePhoto(e){const f=e.target.files[0];if(!f||!APP.currentUser)return;if(!isOwner()){toast('Only the Owner can change profile photos.');e.target.value='';return}try{const url=await uploadFile(f,'uploadPhoto',APP.currentUser.name);const res=await api('updateOwnProfile',{employeeId:APP.currentUser.employeeId,phone:APP.currentUser.phone,email:APP.currentUser.email,photo:url});APP.currentUser=res.member;APP.members=APP.members.map(x=>x.employeeId===APP.currentUser.employeeId?res.member:x);updateProfileUI();fillProfile(APP.currentUser);toast('Profile photo updated')}catch(err){toast(err.message||err)}e.target.value=''}
+async function uploadProfilePhoto(e){const f=e.target.files[0];if(!f||!APP.currentUser)return;try{const url=await uploadFile(f,'uploadPhoto',APP.currentUser.name);const res=await api('updateOwnProfile',{employeeId:APP.currentUser.employeeId,phone:APP.currentUser.phone,email:APP.currentUser.email,photo:url});APP.currentUser=res.member;APP.members=APP.members.map(x=>x.employeeId===APP.currentUser.employeeId?res.member:x);updateProfileUI();fillProfile(APP.currentUser);toast('Profile photo updated successfully')}catch(err){toast(err.message||err)}e.target.value=''}
 function execCmd(cmd){document.execCommand(cmd,false,null);document.getElementById('fullDescription').focus()}
 document.addEventListener('keydown',e=>{if(e.key==='Enter'&&(document.activeElement===document.getElementById('loginEmployeeId')||document.activeElement===document.getElementById('loginPassword')))login();if(e.key==='Escape'){closeTaskDetails();closeAnnouncementModal()}});
 window.addEventListener('load',init);
