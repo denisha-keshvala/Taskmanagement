@@ -1,0 +1,846 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TASK COMMAND - Management System</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+  <style>
+    :root{
+      --bg-main:#f5f7fb;--bg-sidebar:#121829;--card-bg:#fff;--primary:#4318ff;
+      --primary-hover:#3410d9;--text-main:#172033;--text-muted:#718096;--border:#e5e9f2;
+      --danger:#e53e3e;--warning:#d97706;--success:#16a34a;
+    }
+    *{margin:0;padding:0;box-sizing:border-box;font-family:Inter,sans-serif}
+    body{background:var(--bg-main);color:var(--text-main);height:100vh;overflow:hidden}
+    button,input,select{font:inherit}
+    #loginScreen{display:flex;justify-content:center;align-items:center;height:100vh;position:relative;overflow:hidden;min-height:100vh;background:radial-gradient(circle at 15% 15%,rgba(43,126,255,.38),transparent 30%),radial-gradient(circle at 85% 80%,rgba(91,58,255,.38),transparent 32%),linear-gradient(135deg,#020a2d 0%,#062b83 48%,#0b0d38 100%)}
+    #loginScreen:before{content:"";position:absolute;inset:-20%;pointer-events:none;background:radial-gradient(circle at 20% 30%,rgba(0,191,255,.9) 0 2px,transparent 3px),radial-gradient(circle at 75% 25%,rgba(72,120,255,.9) 0 2px,transparent 3px),radial-gradient(circle at 55% 75%,rgba(120,90,255,.8) 0 2px,transparent 3px);background-size:220px 220px,310px 310px,260px 260px;animation:starsMove 18s linear infinite;opacity:.65}
+    @keyframes starsMove{to{transform:translate3d(80px,40px,0)}}
+    .login-shell{position:relative;z-index:2;width:min(470px,92vw);text-align:center}
+    .login-brand{display:flex;align-items:center;justify-content:center;gap:14px;margin-bottom:24px;color:#fff}
+    .login-brand .logo{width:66px;height:66px;border-radius:18px;background:linear-gradient(135deg,#1597ff,#4b42ff);display:flex;align-items:center;justify-content:center;font-size:28px;box-shadow:0 0 35px rgba(0,174,255,.35)}
+    .login-brand h1{font-size:28px;font-weight:800}.login-brand p{margin-top:5px;color:#b9caff;font-size:14px;letter-spacing:2px}
+    .login-box{width:100%;padding:34px;border:1px solid rgba(90,170,255,.38);background:rgba(7,20,65,.68);backdrop-filter:blur(20px);border-radius:28px;box-shadow:0 25px 80px rgba(0,0,0,.42);text-align:left}
+    .login-box h2{color:#fff;text-align:center;font-size:30px;margin-bottom:8px}.login-subtitle{text-align:center;color:#aebee8;margin-bottom:26px}
+    .form-group{margin-bottom:15px}.form-group label{font-size:.85rem;font-weight:600;margin-bottom:6px;display:block}
+    .login-box label{color:#e9efff}.form-group input,.form-group select{width:100%;padding:11px;border:1px solid var(--border);border-radius:8px;font-size:.9rem}
+    .login-box input{background:rgba(3,12,40,.72);color:#fff;border-color:rgba(123,171,255,.28);padding:14px;border-radius:13px;outline:none}
+    .btn-primary{width:100%;background:var(--primary);color:#fff;border:none;padding:12px;border-radius:8px;font-weight:600;cursor:pointer;transition:.2s}
+    .login-box .btn-primary{background:linear-gradient(90deg,#1597ff,#4b42ff);padding:14px;border-radius:13px}
+    .btn-primary:hover{background:var(--primary-hover);transform:translateY(-1px)}
+    .error-msg{color:#ffb4b4;font-size:.8rem;margin-top:10px;display:none;text-align:center}
+    .login-footer{text-align:center;color:#8ea2d4;font-size:12px;margin-top:18px}
+
+    #appDashboard{display:none;height:100vh;width:100vw;position:relative}
+    .sidebar{width:270px;background:var(--bg-sidebar);color:#fff;display:flex;flex-direction:column;padding:20px 0;overflow-y:auto;flex-shrink:0;transition:transform .3s;z-index:1000}
+    .brand{padding:0 20px 20px;font-size:1.25rem;font-weight:800;display:flex;align-items:center;gap:12px}
+    .nav-menu{list-style:none;margin-top:10px;padding:0 12px}.nav-item{padding:12px 16px;font-size:.95rem;cursor:pointer;display:flex;align-items:center;gap:14px;color:#a3aed1;transition:.2s;font-weight:600;border-radius:12px;margin-bottom:6px}
+    .nav-item:hover,.nav-item.active{background:var(--primary);color:#fff}
+    .quick-add{margin:20px 15px;padding:16px;background:rgba(255,255,255,.05);border-radius:14px;border:1px solid rgba(255,255,255,.08)}
+    .quick-add h4{margin-bottom:12px;color:#fff}.quick-add input,.quick-add select{margin-bottom:10px;font-size:.85rem;background:#fff;width:100%;padding:10px;border-radius:8px;border:none;outline:none}
+    .user-profile{padding:15px 20px;display:flex;align-items:center;gap:12px;border-top:1px solid rgba(255,255,255,.08);margin-top:auto}.avatar{width:42px;height:42px;background:#a3aed1;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#0f1424;font-weight:bold;font-size:1.1rem;overflow:hidden}
+    .avatar img{width:100%;height:100%;object-fit:cover}
+    .main-wrapper{flex:1;display:flex;flex-direction:column;overflow-y:auto;width:100%}
+    header{background:#fff;padding:15px 25px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border)}
+    .header-left,.header-right{display:flex;align-items:center;gap:15px}.header-right{gap:20px}.mobile-toggle{display:none;font-size:1.3rem;cursor:pointer;background:none;border:none;color:var(--text-main)}
+    .content-area{padding:25px}.card{background:#fff;padding:20px;border-radius:12px;box-shadow:0 2px 5px rgba(0,0,0,.03);margin-bottom:25px;overflow-x:auto}.card-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:15px}
+    .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:15px}.grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:15px}
+    .editor-toolbar{background:#f8fafc;border:1px solid var(--border);border-bottom:none;padding:8px;border-radius:8px 8px 0 0;display:flex;gap:8px}.editor-toolbar button{padding:4px 8px;background:#fff;border:1px solid var(--border);border-radius:4px;cursor:pointer}
+    .editor-content{min-height:100px;border:1px solid var(--border);border-radius:0 0 8px 8px;padding:10px;background:#fff;outline:none}
+    table{width:100%;border-collapse:collapse;font-size:.85rem;text-align:left;min-width:850px}th{padding:12px;border-bottom:2px solid var(--border);color:var(--text-muted);font-weight:600}td{padding:12px;border-bottom:1px solid var(--border)}
+    .btn-sm{padding:5px 10px;font-size:.75rem;border-radius:6px;border:none;cursor:pointer;color:#fff;margin-right:2px}.btn-edit{background:var(--warning)}.btn-delete{background:var(--danger)}.btn-success{background:var(--success)}
+    .badge{padding:4px 10px;border-radius:12px;font-size:.75rem;font-weight:600;display:inline-block}.badge-high{background:#fee2e2;color:var(--danger)}.badge-medium{background:#fef3c7;color:var(--warning)}.badge-low{background:#d1fae5;color:var(--success)}
+    .status-overdue{background:#fee2e2;color:var(--danger);font-weight:bold;padding:3px 6px;border-radius:4px;font-size:.7rem}.modal-page{display:none}.modal-page.active{display:block}
+    .sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:999}
+    .notif-wrapper{position:relative;cursor:pointer}.notif-bell{font-size:1.2rem}.notif-badge{position:absolute;top:-6px;right:-8px;background:var(--danger);color:#fff;border-radius:50%;padding:2px 6px;font-size:.65rem;font-weight:bold}.notif-dropdown{display:none;position:absolute;right:0;top:35px;width:280px;background:#fff;border:1px solid var(--border);box-shadow:0 5px 15px rgba(0,0,0,.15);border-radius:10px;z-index:1000;padding:10px}.notif-dropdown.show{display:block}.notif-item{padding:8px;border-bottom:1px solid var(--border);font-size:.8rem}
+    .header-profile{display:flex;align-items:center;gap:10px;position:relative}.profile-avatar-container{position:relative;cursor:pointer}.header-avatar{width:40px;height:40px;border-radius:50%;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:bold;object-fit:cover;overflow:hidden}.header-avatar img{width:100%;height:100%;object-fit:cover}
+    .photo-upload-overlay{position:absolute;bottom:0;right:0;background:rgba(0,0,0,.6);color:#fff;border-radius:50%;width:16px;height:16px;display:flex;align-items:center;justify-content:center;font-size:.55rem}
+    .profile-modal{display:none;position:fixed;inset:0;background:rgba(0,8,30,.68);backdrop-filter:blur(10px);z-index:5000;align-items:center;justify-content:center;padding:20px}.profile-modal.show{display:flex}
+    .profile-card{width:min(620px,95vw);background:var(--card-bg);border-radius:24px;box-shadow:0 30px 90px rgba(0,0,0,.35);overflow:hidden}.profile-cover{height:130px;background:linear-gradient(135deg,#071b55,#2148d8,#5b37ff)}
+    .profile-main{padding:0 30px 30px;position:relative}.profile-big-avatar{width:100px;height:100px;border-radius:50%;margin-top:-50px;border:5px solid var(--card-bg);background:linear-gradient(135deg,#1a9cff,#513bff);color:#fff;display:flex;align-items:center;justify-content:center;font-size:38px;font-weight:800;box-shadow:0 12px 30px rgba(40,80,220,.25);object-fit:cover;overflow:hidden}.profile-big-avatar img{width:100%;height:100%;object-fit:cover}
+    .profile-top{display:flex;justify-content:space-between;align-items:flex-end;gap:15px}.profile-top h2{margin:12px 0 4px;font-size:25px}.profile-role{color:var(--text-muted);font-size:13px}.profile-close{border:0;background:var(--bg-main);width:38px;height:38px;border-radius:50%;cursor:pointer;color:var(--text-main);font-size:18px}
+    .profile-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:25px}.profile-info{padding:16px;border:1px solid var(--border);border-radius:14px;background:rgba(0,0,0,.015)}.profile-info .label{font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:var(--text-muted);margin-bottom:6px}.profile-info .value{font-weight:700;color:var(--text-main);word-break:break-word}.profile-actions{display:flex;gap:10px;margin-top:20px}.profile-actions button{flex:1;padding:12px;border:0;border-radius:12px;font-weight:700;cursor:pointer}.profile-actions .primary{background:var(--primary);color:#fff}.profile-actions .secondary{background:var(--bg-main);color:var(--text-main)}
+    .toast{position:fixed;right:20px;bottom:20px;background:#172033;color:#fff;padding:12px 16px;border-radius:10px;z-index:9999;box-shadow:0 10px 30px rgba(0,0,0,.2);display:none}.toast.show{display:block}
+    @media(max-width:768px){.mobile-toggle{display:block}.sidebar{position:fixed;top:0;left:0;height:100vh;transform:translateX(-100%)}.sidebar.open{transform:translateX(0)}.sidebar-overlay.active{display:block}.grid-2,.grid-3{grid-template-columns:1fr}.content-area{padding:15px}header{padding:12px 15px}.header-right>div:nth-child(2)>div:last-child{display:none}.profile-grid{grid-template-columns:1fr}.profile-main{padding:0 20px 24px}}
+    
+.owner-only.hidden-by-role{display:none!important}
+.department-badge{display:inline-flex;align-items:center;gap:6px;padding:4px 9px;border-radius:999px;background:#eaf3ff;color:#1d4ed8;font-size:.68rem;font-weight:700;margin-top:3px}
+.login-department{display:none;margin:14px auto 0;width:max-content;max-width:100%;padding:7px 12px;border:1px solid rgba(125,211,252,.3);border-radius:999px;color:#7dd3fc;font-size:12px;font-weight:700}
+@media(max-width:600px){.login-box{padding:24px}.login-brand h1{font-size:21px}.login-brand .logo{width:54px;height:54px}.header-right{gap:10px}.content-area{padding:10px}.card{padding:15px}}
+  
+    .login-dept-group select{width:100%;background:rgba(3,12,40,.72);color:#fff;border:1px solid rgba(123,171,255,.28);padding:14px 15px;border-radius:13px;outline:none}.login-dept-group select option{color:#111;background:#fff}.login-department{margin-top:8px;color:#7dd3fc;font-weight:700;font-size:13px}
+    .status-saving{font-size:11px;color:#2563eb;margin-left:6px}.status-saved{font-size:11px;color:#16a34a;margin-left:6px}
+
+/* ===== TASK DETAILS / ANNOUNCEMENTS / MOBILE 2.0 ===== */
+.announcement-strip{position:relative;background:linear-gradient(135deg,#0b1d4d,#244bd7);color:#fff;border-radius:18px;padding:16px 18px;margin-bottom:18px;box-shadow:0 10px 30px rgba(37,71,190,.14);overflow:hidden}
+.announcement-strip:after{content:"";position:absolute;width:180px;height:180px;right:-70px;top:-90px;border-radius:50%;background:rgba(255,255,255,.08)}
+.announcement-head{display:flex;justify-content:space-between;align-items:center;gap:10px;position:relative;z-index:1}.announcement-head h3{font-size:15px}.announcement-head button{border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.1);color:#fff;border-radius:9px;padding:7px 10px;cursor:pointer;font-size:12px}.announcement-list{display:flex;gap:12px;overflow-x:auto;scrollbar-width:thin;padding-top:12px;position:relative;z-index:1}.announcement-card{min-width:270px;max-width:380px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.15);border-radius:14px;padding:13px}.announcement-card .ann-type{font-size:10px;text-transform:uppercase;letter-spacing:.8px;opacity:.75}.announcement-card h4{font-size:14px;margin:5px 0}.announcement-card .ann-desc{font-size:12px;line-height:1.45;opacity:.92;max-height:60px;overflow:hidden}.announcement-card small{display:block;margin-top:8px;opacity:.7}.announcement-empty{font-size:12px;opacity:.75;padding:5px 0}
+.task-row{cursor:pointer;transition:.15s}.task-row:hover{background:#f7f9ff}.task-row td:first-child{border-left:3px solid transparent}.task-row:hover td:first-child{border-left-color:var(--primary)}
+.task-modal{display:none;position:fixed;inset:0;background:rgba(3,10,35,.68);backdrop-filter:blur(8px);z-index:7000;align-items:center;justify-content:center;padding:14px}.task-modal.show{display:flex}.task-modal-card{width:min(760px,96vw);max-height:92vh;overflow:auto;background:#fff;border-radius:22px;box-shadow:0 30px 90px rgba(0,0,0,.35)}.task-modal-cover{padding:22px;background:linear-gradient(135deg,#071b55,#3157e8,#5b37ff);color:#fff}.task-modal-cover .mini{font-size:11px;opacity:.75;text-transform:uppercase;letter-spacing:1px}.task-modal-cover h2{margin-top:5px;font-size:24px}.task-modal-body{padding:20px}.task-detail-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.task-detail{border:1px solid var(--border);border-radius:13px;padding:13px;background:#fbfcff}.task-detail .label{font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.7px;margin-bottom:5px}.task-detail .value{font-weight:700;word-break:break-word}.task-description{margin-top:14px;border:1px solid var(--border);border-radius:14px;padding:16px;line-height:1.55;overflow-wrap:anywhere}.task-description img{max-width:100%}.task-modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}.announcement-editor{min-height:150px;border:1px solid var(--border);border-radius:0 0 10px 10px;padding:12px;background:#fff;outline:none}.announcement-type-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}.event-chip{border:1px solid var(--border);background:#fff;border-radius:10px;padding:9px 7px;text-align:center;cursor:pointer;font-size:11px}.event-chip.active{border-color:var(--primary);background:#eef0ff;color:var(--primary);font-weight:700}.announcement-modal .profile-card{width:min(720px,96vw)}
+.team-list-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}.team-person{border:1px solid var(--border);border-radius:16px;padding:15px;background:#fff;display:flex;gap:12px;align-items:center}.team-person .team-avatar{width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,#1597ff,#4b42ff);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;flex:none;overflow:hidden}.team-avatar img{width:100%;height:100%;object-fit:cover}.team-person h4{font-size:14px}.team-person p{font-size:11px;color:var(--text-muted);margin-top:2px}.team-person .dept{display:inline-block;margin-top:5px;font-size:10px;font-weight:700;color:#1d4ed8;background:#eaf3ff;padding:3px 7px;border-radius:99px}
+.mobile-bottom-safe{height:10px}
+@media(max-width:900px){.team-list-grid{grid-template-columns:1fr 1fr}.task-detail-grid{grid-template-columns:1fr 1fr}.announcement-type-grid{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:600px){body{overflow:hidden}.main-wrapper{min-width:0}.content-area{padding:9px}.card{padding:13px;border-radius:15px;margin-bottom:12px}.card-header{gap:8px}.card-header h3{font-size:15px}header{min-height:58px}.header-right{gap:7px}.header-profile>div:last-child{display:none}.notif-dropdown{position:fixed;right:8px;top:62px;width:min(330px,calc(100vw - 16px))}.header-avatar{width:36px;height:36px}.mobile-toggle{font-size:1.1rem}.sidebar{width:86vw;max-width:320px}.task-modal{padding:8px}.task-modal-card{border-radius:17px;max-height:95vh}.task-modal-cover{padding:17px}.task-modal-cover h2{font-size:20px}.task-modal-body{padding:13px}.task-detail-grid{grid-template-columns:1fr 1fr;gap:8px}.task-detail{padding:10px}.task-detail .value{font-size:12px}.task-description{padding:12px;font-size:13px}.announcement-strip{border-radius:14px;padding:13px}.announcement-card{min-width:245px}.team-list-grid{grid-template-columns:1fr}.grid-2,.grid-3{gap:8px}.form-group{margin-bottom:11px}table{min-width:720px;font-size:12px}.btn-sm{padding:5px 7px}.announcement-type-grid{grid-template-columns:repeat(2,1fr)}}
+
+
+.mobile-task-card{background:#fff;border:1px solid var(--border);border-radius:15px;padding:13px;margin-bottom:10px;box-shadow:0 4px 14px rgba(20,35,70,.05)}.mobile-task-top{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}.mobile-task-title{font-weight:800;font-size:14px}.mobile-task-id{font-size:10px;color:var(--text-muted);margin-top:3px}.mobile-task-meta{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin:11px 0}.mobile-task-meta div{background:#f7f9fc;border-radius:9px;padding:8px}.mobile-task-meta span{display:block;font-size:9px;color:var(--text-muted);text-transform:uppercase}.mobile-task-meta b{font-size:11px}.mobile-task-bottom{display:flex;align-items:center;gap:8px}.mobile-task-bottom select{flex:1;padding:8px;border:1px solid var(--border);border-radius:9px}.mobile-task-bottom button{border:0;border-radius:9px;padding:8px 10px;background:#eef0ff;color:var(--primary)}
+@media(max-width:600px){#dashboardTaskTable{display:none}#mobileTaskList{display:block!important}#dashboard-page .card-header .btn-success{padding:6px 8px}.mobile-task-bottom .btn-sm{margin:0}}
+
+
+.hidden-by-role{display:none!important}
+.task-row{cursor:pointer}.task-row:hover{background:#f8faff}
+.task-modal{display:none;position:fixed;inset:0;background:rgba(3,10,35,.68);backdrop-filter:blur(8px);z-index:6000;align-items:center;justify-content:center;padding:16px}.task-modal.show{display:flex}.task-modal-card{width:min(760px,96vw);max-height:92vh;overflow:auto;background:#fff;border-radius:24px;box-shadow:0 30px 90px rgba(0,0,0,.35)}.task-modal-cover{padding:24px 28px;background:linear-gradient(135deg,#081b55,#254bd7,#5b37ff);color:#fff}.task-modal-cover .mini{font-size:11px;letter-spacing:1px;opacity:.75}.task-modal-body{padding:24px}.task-detail-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.task-detail{padding:13px;border:1px solid var(--border);border-radius:13px;background:#fafbff}.task-detail .label{text-transform:uppercase;font-size:10px;letter-spacing:.7px;color:var(--text-muted);margin-bottom:5px}.task-detail .value{font-weight:700;font-size:13px;word-break:break-word}.task-description{margin-top:16px;padding:17px;border:1px solid var(--border);border-radius:14px;line-height:1.6;background:#fbfcff;overflow-wrap:anywhere}.task-modal-actions{display:flex;gap:8px;margin-top:16px}.mobile-task-card{background:#fff;border:1px solid var(--border);border-radius:16px;padding:15px;margin-bottom:12px;box-shadow:0 4px 14px rgba(0,0,0,.04);cursor:pointer}.mobile-task-top{display:flex;justify-content:space-between;gap:10px}.mobile-task-title{font-weight:800;font-size:14px}.mobile-task-id{font-size:11px;color:var(--text-muted);margin-top:3px}.mobile-task-meta{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:14px 0}.mobile-task-meta span{display:block;font-size:10px;color:var(--text-muted);text-transform:uppercase}.mobile-task-meta b{font-size:12px}.mobile-task-bottom{display:flex;gap:8px}.mobile-task-bottom select{flex:1;padding:8px;border:1px solid var(--border);border-radius:9px}.mobile-task-bottom button{width:42px;border:0;border-radius:9px;background:var(--primary);color:#fff}.dashboard-welcome{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:18px}.greeting h1{font-size:25px;margin-bottom:5px}.greeting p{color:var(--text-muted);font-size:13px}.dashboard-dept{padding:10px 14px;border-radius:14px;background:#fff;border:1px solid var(--border);font-weight:700;font-size:12px}.stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px}.stat-card{background:#fff;border:1px solid var(--border);border-radius:16px;padding:17px;cursor:pointer;box-shadow:0 3px 12px rgba(0,0,0,.03);transition:.2s}.stat-card:hover{transform:translateY(-2px);box-shadow:0 10px 25px rgba(0,0,0,.06)}.stat-card .icon{width:38px;height:38px;border-radius:11px;display:flex;align-items:center;justify-content:center;background:#eef2ff;color:var(--primary);margin-bottom:10px}.stat-card .num{font-size:25px;font-weight:800}.stat-card .label{font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.6px;margin-top:3px}.report-export-card{border-radius:22px;padding:18px;background:linear-gradient(145deg,#f7faff 0%,#eef3ff 48%,#f8f5ff 100%);border:1px solid #dce5ff;box-shadow:0 14px 35px rgba(37,75,215,.08)}.report-hero{display:flex;align-items:center;gap:12px;margin-bottom:16px}.report-hero-icon{width:48px;height:48px;border-radius:15px;background:linear-gradient(135deg,#1597ff,#5b37ff);color:#fff;display:flex;align-items:center;justify-content:center;font-size:20px;box-shadow:0 10px 22px rgba(65,75,220,.22)}.report-hero h3{font-size:18px}.report-hero p{font-size:11px;color:var(--text-muted);margin-top:3px}.report-filters{display:grid;grid-template-columns:1.3fr 1fr auto auto auto;gap:10px;align-items:end}.report-filters label{font-size:11px;color:var(--text-muted);font-weight:700;display:block;margin-bottom:5px}.report-filters select{width:100%;padding:11px;border:1px solid #cfd9ef;border-radius:11px;background:#fff}.report-btn{border:0;border-radius:11px;padding:11px 14px;color:#fff;font-weight:800;cursor:pointer;white-space:nowrap;box-shadow:0 7px 16px rgba(20,35,70,.09);transition:.18s}.report-btn:hover{transform:translateY(-1px)}.report-btn.pdf{background:linear-gradient(135deg,#ef4444,#b91c1c)}.report-btn.excel{background:linear-gradient(135deg,#16a34a,#087f3d)}.report-btn.csv{background:linear-gradient(135deg,#2563eb,#4f46e5)}.report-note{margin-top:12px;padding:10px 12px;border-radius:11px;background:rgba(255,255,255,.75);border:1px solid #dce5ff;color:#52627d;font-size:10px}.report-note i{color:#3157e8;margin-right:4px} .report-summary{margin-top:15px;display:flex;gap:10px;flex-wrap:wrap}.summary-pill{padding:8px 11px;border-radius:10px;background:#fff;border:1px solid #dbe3f3;font-size:12px;font-weight:800}.followup-note{font-size:11px;color:var(--text-muted);margin-top:5px}
+    .multi-assignee{position:relative;width:100%}.multi-assignee-trigger{width:100%;min-height:44px;padding:11px 13px;border:1px solid var(--border);border-radius:10px;background:#fff;color:var(--text-main);display:flex;align-items:center;justify-content:space-between;gap:10px;cursor:pointer;text-align:left}.multi-assignee-trigger:hover{border-color:#9bb5ef}.multi-assignee-trigger i{color:var(--text-muted);font-size:12px;transition:.18s}.multi-assignee.open .multi-assignee-trigger i{transform:rotate(180deg)}.multi-assignee-menu{display:none;position:absolute;left:0;right:0;top:calc(100% + 6px);background:#fff;border:1px solid #d9e1ef;border-radius:13px;box-shadow:0 18px 45px rgba(20,35,70,.18);padding:7px;z-index:3500;max-height:270px;overflow:auto}.multi-assignee.open .multi-assignee-menu{display:block}.assignee-option{display:flex;align-items:center;gap:10px;padding:10px 9px;border-radius:9px;cursor:pointer;transition:.15s}.assignee-option:hover{background:#f3f6ff}.assignee-option input{width:17px;height:17px;accent-color:var(--primary);cursor:pointer;flex:0 0 auto}.assignee-option span{font-size:13px;font-weight:600;color:var(--text-main)}.assignee-empty{padding:14px;text-align:center;color:var(--text-muted);font-size:12px}.assignee-selected-count{margin-top:6px;font-size:11px;color:var(--text-muted)}.assignee-selected-count i{margin-right:4px;color:var(--primary)}
+    .report-filters>div{min-width:0}.report-filters select{min-height:44px}.report-btn{min-height:44px}.report-export-card{overflow:visible}
+
+@media(max-width:900px){.stat-grid{grid-template-columns:repeat(2,1fr)}.task-detail-grid{grid-template-columns:1fr 1fr}.report-filters{grid-template-columns:1fr 1fr}.report-btn{width:100%}.dashboard-welcome{align-items:flex-start;flex-direction:column}}
+@media(max-width:768px){body{overflow:auto}.content-area{padding:14px}.content-area .card{padding:15px}.header-right{gap:9px}.header-right .header-profile>div:last-child,.header-right .header-profile p:not(:first-child){display:none}.header-right>button{padding:7px 10px!important}.header-profile{gap:4px}.announcement-list{margin-right:-5px}.announcement-card{min-width:240px}.stat-grid{gap:9px}.stat-card{padding:13px}.stat-card .num{font-size:21px}.greeting h1{font-size:21px}.task-detail-grid{grid-template-columns:1fr}.task-modal-card{border-radius:18px}.report-filters{grid-template-columns:1fr}.report-btn{width:100%}}
+
+  
+    @media(max-width:768px){.report-export-card{padding:14px;border-radius:17px}.report-hero{align-items:flex-start}.report-hero-icon{width:42px;height:42px;flex:0 0 42px}.report-hero h3{font-size:16px}.report-filters{display:grid;grid-template-columns:1fr;gap:9px}.report-filters>div,.report-btn{width:100%}.report-btn{min-height:46px;font-size:13px}.report-summary{display:grid;grid-template-columns:1fr 1fr;gap:7px}.summary-pill{text-align:center;font-size:11px;padding:9px 7px}.report-note{font-size:10px;line-height:1.5}.multi-assignee-menu{position:fixed;left:12px;right:12px;top:auto;max-height:55vh}.multi-assignee-trigger{min-height:46px}.assignee-option{padding:12px 9px}.assignee-option input{width:19px;height:19px}}
+    @media(max-width:380px){.report-summary{grid-template-columns:1fr}.report-hero p{font-size:10px}}
+</style>
+</head>
+<body>
+
+<div id="loginScreen">
+  <div class="login-shell">
+    <div class="login-brand">
+      <div class="logo"><i class="fas fa-list-check"></i></div>
+      <div><h1>TASK COMMAND</h1><p>TEAM MANAGEMENT SYSTEM</p></div>
+    </div>
+    <div class="login-box">
+      <h2>Welcome Back</h2>
+      <div class="login-subtitle">Sign in with your Employee ID & Password</div>
+      <div class="form-group">
+        <label>Employee ID</label>
+        <input type="text" id="loginEmployeeId" placeholder="e.g. denisha" autocomplete="username">
+      </div>
+      <div class="form-group">
+        <label>Password</label>
+        <input type="password" id="loginPassword" placeholder="e.g. denisha@123" autocomplete="current-password">
+        <small style="display:block;margin-top:6px;color:#8ea2d4;font-size:11px;">Default password: Employee ID + @123</small>
+      </div>
+      <div class="form-group login-dept-group"><label>Department</label><select id="loginDepartmentSelect" required><option value="">-- Select Department --</option><option value="Amazon">Amazon</option><option value="Flipkart">Flipkart</option><option value="Other">Other</option></select></div>
+      <button class="btn-primary" onclick="login()"><i class="fas fa-right-to-bracket"></i> Login</button>
+      <div class="error-msg" id="loginError"></div>
+      <div class="login-department" id="loginDepartment"></div><div class="login-footer">Your data is securely stored in Supabase.</div>
+    </div>
+  </div>
+</div>
+
+<div id="appDashboard">
+  <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
+  <aside class="sidebar" id="sidebar">
+    <div class="brand"><i class="fas fa-bars"></i> TASK COMMAND</div>
+    <ul class="nav-menu">
+      <li class="nav-item active" id="dashboardNav" onclick="switchTaskFilter('all','Dashboard',this)"><i class="fas fa-home"></i> Dashboard</li>
+      <li class="nav-item" onclick="switchTaskFilter('my','My Tasks',this)"><i class="fas fa-list-check"></i> My Tasks</li>
+      <li class="nav-item owner-only" id="allTasksNav" onclick="switchTaskFilter('all','All Tasks',this)"><i class="fas fa-layer-group"></i> All Tasks</li>
+      <li class="nav-item" onclick="switchTaskFilter('in-progress','In Progress',this)"><i class="fas fa-clock"></i> In Progress</li>
+      <li class="nav-item" onclick="switchTaskFilter('completed','Completed',this)"><i class="fas fa-circle-check"></i> Completed</li>
+      <li class="nav-item" id="assignTaskNav" onclick="switchPage('assign-task-page','Assign Task',this)"><i class="fas fa-plus-circle"></i> Assign Task</li>
+       <li class="nav-item" id="teamNav" onclick="switchPage('team-page','Team Members',this)"><i class="fas fa-users"></i> Team Members</li>
+      <li class="nav-item" id="reportsNav" onclick="switchPage('reports-page','Reports & Export',this)"><i class="fas fa-chart-column"></i> Reports & Export</li>
+      <li class="nav-item owner-only" id="addMemberNav" onclick="switchPage('add-member-page','Add Member',this)"><i class="fas fa-user-plus"></i> Add Member</li>
+    </ul>
+    <div class="quick-add owner-only" id="quickAddBox">
+      <h4>Quick Add Task</h4>
+      <input type="text" id="quickTitle" placeholder="Task Title / Type">
+      <select id="quickDepartment"><option value="">Department</option><option value="Amazon">Amazon</option><option value="Flipkart">Flipkart</option><option value="Other">Other</option></select>
+      <select id="quickAssignee"></select>
+      <select id="quickPriority"><option value="High">High Priority</option><option value="Medium" selected>Medium Priority</option><option value="Low">Low Priority</option></select>
+      <input type="date" id="quickDueDate">
+      <button class="btn-primary" style="padding:10px" onclick="createQuickTask()">+ Add Task</button>
+    </div>
+    <div class="user-profile" onclick="openProfileModal()" title="Open Employee Profile" style="cursor:pointer">
+      <div class="avatar" id="sidebarAvatar">S</div>
+      <div><p style="font-size:.85rem;font-weight:700;color:#fff" id="sidebarUserName">Employee</p><p style="font-size:.72rem;color:#a3aed1" id="sidebarUserRole">Active User</p><p style="font-size:.68rem;color:#7dd3fc" id="sidebarUserDepartment"></p></div>
+    </div>
+  </aside>
+
+  <div class="main-wrapper">
+    <header>
+      <div class="header-left"><button class="mobile-toggle" onclick="toggleSidebar()"><i class="fas fa-bars"></i></button><h3 id="currentPageTitle">Dashboard</h3></div>
+      <div class="header-right">
+        <div class="notif-wrapper" onclick="toggleNotificationDropdown()">
+          <i class="fas fa-bell notif-bell"></i><span class="notif-badge" id="notifCount">0</span>
+          <div class="notif-dropdown" id="notifDropdown"><h4 style="margin-bottom:8px;font-size:.85rem;border-bottom:1px solid var(--border);padding-bottom:5px">Notifications</h4><div id="notifList" style="max-height:200px;overflow-y:auto"></div></div>
+        </div>
+        <div class="header-profile">
+          <div class="profile-avatar-container" onclick="openProfileModal()" title="Open employee profile">
+            <div id="headerAvatar" class="header-avatar">S</div>
+            <div class="photo-upload-overlay" onclick="event.stopPropagation();document.getElementById('profilePhotoInput').click()"><i class="fas fa-camera"></i></div>
+          </div>
+          <input type="file" id="profilePhotoInput" accept="image/*" style="display:none" onchange="uploadProfilePhoto(event)">
+          <div><p style="font-size:.85rem;font-weight:700;color:var(--text-main)" id="userProfileName">Employee</p><p style="font-size:.7rem;color:var(--text-muted)" id="sidebarUserRole2">Active User</p><p style="font-size:.68rem;color:#2563eb" id="headerUserDepartment"></p></div>
+        </div>
+        <button style="background:var(--danger);color:#fff;border:none;padding:7px 16px;border-radius:8px;cursor:pointer;font-weight:600" onclick="logout()">Logout</button>
+      </div>
+    </header>
+
+    <div class="content-area">
+      <div id="dashboardHero">
+        <div class="dashboard-welcome">
+          <div class="greeting"><h1 id="greetingText">Good Morning, Employee 👋</h1><p id="greetingSubtext">Here is your task overview for today.</p></div>
+          <div class="dashboard-dept" id="dashboardDepartment">Department: —</div>
+        </div>
+        <div class="stat-grid">
+          <div class="stat-card" onclick="openCountDetails('open')"><div class="icon"><i class="fas fa-folder-open"></i></div><div class="num" id="countOpen">0</div><div class="label">Open Tasks</div></div>
+          <div class="stat-card" onclick="openCountDetails('pending')"><div class="icon"><i class="fas fa-hourglass-half"></i></div><div class="num" id="countPending">0</div><div class="label">Pending</div></div>
+          <div class="stat-card" onclick="openCountDetails('in-progress')"><div class="icon"><i class="fas fa-spinner"></i></div><div class="num" id="countProgress">0</div><div class="label">In Progress</div></div>
+          <div class="stat-card" onclick="openCountDetails('completed')"><div class="icon"><i class="fas fa-circle-check"></i></div><div class="num" id="countCompleted">0</div><div class="label">Completed</div></div>
+        </div>
+      </div>
+      <section class="announcement-strip" id="announcementStrip">
+        <div class="announcement-head">
+          <h3><i class="fas fa-bullhorn"></i> Company Updates & Announcements</h3>
+          <button class="owner-only" id="postAnnouncementBtn" onclick="openAnnouncementModal()"><i class="fas fa-plus"></i> Post</button>
+        </div>
+        <div class="announcement-list" id="announcementList"><div class="announcement-empty">No announcements yet.</div></div>
+      </section>
+      <div id="dashboard-page" class="modal-page active">
+        <div class="card">
+          <div class="card-header"><h3 id="taskTableHeading">Live Task List</h3><button class="btn-sm btn-success" onclick="loadData()"><i class="fas fa-rotate"></i> Refresh</button></div>
+          <table><thead><tr><th>Task ID</th><th>Task Type</th><th>Assigned To</th><th>Priority</th><th>Deadline</th><th>Status Track</th><th>Completion Time</th><th>Actions</th></tr></thead><tbody id="dashboardTaskTable"></tbody></table>
+          <div id="mobileTaskList" style="display:none"></div>
+        </div>
+      </div>
+
+      <div id="assign-task-page" class="modal-page">
+        <div class="card">
+          <div class="card-header"><h2 id="taskFormTitle"><i class="fas fa-tasks"></i> Assign New Task</h2></div>
+          <form onsubmit="submitFullTask(event)">
+            <input type="hidden" id="editTaskId">
+            <div class="grid-2">
+              <div class="form-group"><label>Department</label><select id="fullTaskDepartment" required><option value="">-- Select Department --</option><option value="Amazon">Amazon</option><option value="Flipkart">Flipkart</option><option value="Other">Other</option></select></div>
+              <div class="form-group"><label>Select Task Type</label><select id="fullTaskType" required>
+                <option value="" disabled selected>-- Choose Task Type --</option>
+                <optgroup label="Operations Modules"><option>CATALOGUE</option><option>SALES</option><option>INVENTORY</option><option>PURCHASE ORDER (PO)</option><option>APPOINTMENTS</option></optgroup>
+                <optgroup label="Reports"><option>DOWNLOAD SALES REPORT</option><option>DOWNLOAD ADVERTISEMENT REPORT</option><option>AMAZON PI KW REPORTS DOWNLOAD</option><option>AMAZON PI ACCOUNT ACCESS & SETTINGS</option></optgroup>
+                <optgroup label="Orders & Account Health"><option>CHECK ORDERS</option><option>SELLER FULFILLED RETURNS</option><option>CHECK ACCOUNT HEALTH</option><option>CHECK PERFORMANCE NOTIFICATION</option><option>CUSTOMER REVIEWS</option><option>GMAIL</option><option>TOP ASIN LISTING & PRICE</option><option>BUYER MESSAGE</option><option>ADVERTISEMENT</option><option>CASE</option></optgroup>
+              </select></div>
+              <div class="form-group assignee-field"><label>Assign To (Team Member)</label><select id="fullAssignee" multiple aria-hidden="true" tabindex="-1" style="display:none;"></select><div class="multi-assignee" id="multiAssignee"><button type="button" class="multi-assignee-trigger" id="multiAssigneeTrigger" onclick="toggleAssigneePicker(event)"><span id="multiAssigneeText">-- Select Member --</span><i class="fas fa-chevron-down"></i></button><div class="multi-assignee-menu" id="multiAssigneeMenu"></div></div><div class="assignee-selected-count" id="assigneeSelectedCount"><i class="fas fa-users"></i> Select one or more employees</div></div>
+            </div>
+            <div class="grid-3">
+              <div class="form-group"><label>Priority</label><select id="fullPriority"><option>High</option><option selected>Medium</option><option>Low</option></select></div>
+              <div class="form-group"><label>Set Deadline Date</label><input type="date" id="fullDeadline" required></div>
+              <div class="form-group"><label>Set Reminder Date & Time</label><input type="datetime-local" id="fullReminder"></div>
+            </div>
+            <div class="form-group"><label>Follow-up Person <span style="font-weight:400;color:var(--text-muted)">(Optional)</span></label><select id="fullFollowUp"><option value="">-- No Follow-up --</option></select><div class="followup-note">A notification will be sent to the selected follow-up person.</div></div>
+            <div class="form-group"><label>Task Description & Instructions</label><div class="editor-toolbar"><button type="button" onclick="execCmd('bold')"><i class="fas fa-bold"></i></button><button type="button" onclick="execCmd('italic')"><i class="fas fa-italic"></i></button><button type="button" onclick="execCmd('underline')"><i class="fas fa-underline"></i></button></div><div class="editor-content" id="fullDescription" contenteditable="true"></div></div>
+            <div class="form-group"><label><i class="fas fa-paperclip"></i> Attach File / Document</label><input type="file" id="fullTaskFile" style="padding:8px;background:#fff;border:1px solid var(--border);border-radius:8px;width:100%"></div>
+            <button type="submit" class="btn-primary" style="margin-top:10px" id="saveTaskBtn"><i class="fas fa-paper-plane"></i> Assign Task</button>
+          </form>
+        </div>
+      </div>
+
+      <div id="reports-page" class="modal-page">
+        <div class="card">
+          <div class="card-header"><div><h2><i class="fas fa-chart-column"></i> Reports & Export</h2><p style="color:var(--text-muted);font-size:12px;margin-top:3px">Export daily, weekly, monthly or all task data as PDF/CSV.</p></div></div>
+          <div class="report-export-card">
+            <div class="report-hero">
+              <div class="report-hero-icon"><i class="fas fa-chart-pie"></i></div>
+              <div><h3>Smart Task Export</h3><p>Download the same task data in a clean, dashboard-style report.</p></div>
+            </div>
+            <div class="report-filters">
+              <div class="owner-report-filter"><label>Employee</label><select id="reportEmployee"></select></div>
+              <div><label>Period</label><select id="reportPeriod"><option value="daily">Today</option><option value="weekly">This Week</option><option value="monthly">This Month</option><option value="all" selected>All Time</option></select></div>
+              <button class="report-btn pdf" onclick="downloadTaskReport('pdf')"><i class="fas fa-file-pdf"></i> PDF Report</button>
+              <button class="report-btn excel" onclick="downloadTaskReport('xlsx')"><i class="fas fa-file-excel"></i> Styled Excel</button>
+              <button class="report-btn csv" onclick="downloadTaskReport('csv')"><i class="fas fa-file-csv"></i> CSV</button>
+            </div>
+            <div class="report-note"><i class="fas fa-circle-info"></i> PDF and Excel keep the TASK COMMAND visual style. CSV is a plain-data format, so colors/cards are not supported by the CSV standard.</div>
+            <div class="report-summary" id="reportSummary"><span class="summary-pill">Select a period and export.</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div id="team-page" class="modal-page">
+        <div class="card"><div class="card-header"><div><h2><i class="fas fa-users"></i> Team Members</h2><p style="color:var(--text-muted);font-size:12px;margin-top:3px">Choose a teammate when assigning a task.</p></div></div><div class="team-list-grid" id="teamList"></div></div>
+      </div>
+
+      <div id="add-member-page" class="modal-page">
+        <div class="card" style="max-width:600px">
+          <div class="card-header"><h2 id="memberFormTitle"><i class="fas fa-user-plus"></i> Add New Team Member</h2></div>
+          <form onsubmit="saveMember(event)">
+            <input type="hidden" id="editMemberIndex" value="-1">
+            <div class="form-group"><label>Member Name</label><input type="text" id="memberName" required></div>
+            <div class="form-group"><label>Member Role</label><input type="text" id="memberRole" required></div>
+            <div class="form-group"><label>Email Address</label><input type="email" id="memberEmail" required></div>
+            <div class="form-group"><label>Phone Number</label><input type="tel" id="memberPhone" required></div>
+          <div class="form-group"><label>Department</label><select id="memberDepartment" required><option value="">-- Select Department --</option><option value="Amazon">Amazon</option><option value="Flipkart">Flipkart</option><option value="Other">Other</option></select></div>
+            <button type="submit" class="btn-primary" id="saveMemberBtn">Save Member</button>
+          </form>
+        </div>
+        <div class="card"><h3>Team Members & Performance Track</h3><table style="margin-top:15px"><thead><tr><th>Name</th><th>Role</th><th>Email</th><th>Phone</th><th>Completed Tasks</th><th>Actions</th></tr></thead><tbody id="memberTableBody"></tbody></table></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="task-modal" id="taskDetailsModal" onclick="if(event.target===this)closeTaskDetails()">
+  <div class="task-modal-card">
+    <div class="task-modal-cover"><div class="mini" id="detailTaskId">TASK</div><h2 id="detailTaskTitle">Task Details</h2></div>
+    <div class="task-modal-body">
+      <div class="task-detail-grid">
+        <div class="task-detail"><div class="label">Assigned To</div><div class="value" id="detailAssignedTo">—</div></div>
+        <div class="task-detail"><div class="label">Assigned By</div><div class="value" id="detailAssignedBy">—</div></div>
+        <div class="task-detail"><div class="label">Follow-up</div><div class="value" id="detailFollowUp">—</div></div>
+        <div class="task-detail"><div class="label">Department</div><div class="value" id="detailDepartment">—</div></div>
+        <div class="task-detail"><div class="label">Priority</div><div class="value" id="detailPriority">—</div></div>
+        <div class="task-detail"><div class="label">Deadline</div><div class="value" id="detailDeadline">—</div></div>
+        <div class="task-detail"><div class="label">Status</div><div class="value" id="detailStatus">—</div></div>
+        <div class="task-detail"><div class="label">Created</div><div class="value" id="detailCreated">—</div></div>
+        <div class="task-detail"><div class="label">Reminder</div><div class="value" id="detailReminder">—</div></div>
+        <div class="task-detail"><div class="label">Completed</div><div class="value" id="detailCompleted">—</div></div>
+      </div>
+      <div class="task-description" id="detailDescription">No description.</div>
+      <div class="task-modal-actions"><a id="detailFile" class="btn-sm btn-success" target="_blank" style="display:none"><i class="fas fa-paperclip"></i> Open Attachment</a><button class="btn-sm btn-edit" onclick="closeTaskDetails()">Close</button></div>
+    </div>
+  </div>
+</div>
+
+<div class="profile-modal announcement-modal" id="announcementModal" onclick="if(event.target===this)closeAnnouncementModal()">
+  <div class="profile-card">
+    <div class="profile-cover"></div>
+    <div class="profile-main">
+      <div class="profile-top"><div><h2 style="margin-top:15px">Create Announcement</h2><div class="profile-role">Share appreciation, birthday wishes, events, tours, games or important instructions.</div></div><button class="profile-close" onclick="closeAnnouncementModal()"><i class="fas fa-times"></i></button></div>
+      <div class="form-group" style="margin-top:18px"><label>Announcement Title</label><input id="annTitle" placeholder="e.g. Great work team! 🎉"></div>
+      <div class="announcement-type-grid" id="announcementTypeGrid">
+        <button type="button" class="event-chip active" data-type="Announcement" onclick="selectAnnouncementType(this)">📢 Announcement</button>
+        <button type="button" class="event-chip" data-type="Appreciation" onclick="selectAnnouncementType(this)">🏆 Appreciation</button>
+        <button type="button" class="event-chip" data-type="Birthday" onclick="selectAnnouncementType(this)">🎂 Birthday</button>
+        <button type="button" class="event-chip" data-type="Event" onclick="selectAnnouncementType(this)">🎉 Event</button>
+        <button type="button" class="event-chip" data-type="Tour" onclick="selectAnnouncementType(this)">🚌 Tour</button>
+        <button type="button" class="event-chip" data-type="Game" onclick="selectAnnouncementType(this)">🎮 Game</button>
+        <button type="button" class="event-chip" data-type="Instruction" onclick="selectAnnouncementType(this)">📌 Instruction</button>
+      </div>
+      <div class="form-group" style="margin-top:14px"><label>Description / Instructions</label><div class="editor-toolbar"><button type="button" onclick="execAnnouncementCmd('bold')"><i class="fas fa-bold"></i></button><button type="button" onclick="execAnnouncementCmd('italic')"><i class="fas fa-italic"></i></button><button type="button" onclick="execAnnouncementCmd('underline')"><i class="fas fa-underline"></i></button></div><div class="announcement-editor" id="annDescription" contenteditable="true"></div></div>
+      <div class="form-group"><label><i class="fas fa-paperclip"></i> Add File</label><input type="file" id="annFile" style="padding:8px;background:#fff;border:1px solid var(--border);border-radius:8px;width:100%"></div>
+      <div class="profile-actions"><button class="secondary" onclick="closeAnnouncementModal()">Cancel</button><button class="primary" onclick="publishAnnouncement()" id="publishAnnouncementBtn">Publish Announcement</button></div>
+    </div>
+  </div>
+</div>
+
+<div class="profile-modal" id="profileModal" onclick="if(event.target===this)closeProfileModal()">
+  <div class="profile-card">
+    <div class="profile-cover"></div>
+    <div class="profile-main">
+      <div class="profile-top">
+        <div><div class="profile-big-avatar" id="profileBigAvatar">S</div><h2 id="profileName">Employee</h2><div class="profile-role" id="profileRole">Active User</div></div>
+        <button class="profile-close" onclick="closeProfileModal()"><i class="fas fa-times"></i></button>
+      </div>
+      <div class="profile-grid">
+        <div class="profile-info"><div class="label">Role</div><div class="value" id="profileRole2">Not added</div></div>
+        <div class="profile-info"><div class="label">Mobile Number</div><div class="value" id="profilePhone">Not added</div></div>
+        <div class="profile-info"><div class="label">Email</div><div class="value" id="profileEmail">Not added</div></div>
+        <div class="profile-info"><div class="label">Employee ID</div><div class="value" id="profileEmployeeId">Not added</div></div>
+      </div>
+      <div class="profile-actions"><button class="secondary" onclick="document.getElementById('profilePhotoInput').click()"><i class="fas fa-camera"></i> Change Photo</button><button class="primary" onclick="toggleProfileEdit()"><i class="fas fa-pen"></i> Edit Profile</button></div>
+      <div id="profileEditPanel" style="display:none;margin-top:18px;padding-top:18px;border-top:1px solid var(--border)">
+        <div class="profile-grid">
+          <div class="profile-info"><div class="label">Employee Name</div><input id="editProfileName" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:9px"></div>
+          <div class="profile-info"><div class="label">Role</div><input id="editProfileRole" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:9px"></div>
+          <div class="profile-info"><div class="label">Mobile Number</div><input id="editProfilePhone" type="tel" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:9px"></div>
+          <div class="profile-info"><div class="label">Email</div><input id="editProfileEmail" type="email" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:9px"></div>
+        </div>
+        <div class="profile-actions"><button class="secondary" onclick="closeProfileEdit()">Cancel</button><button class="primary" onclick="saveProfileChanges()">Save Changes</button></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<input type="file" id="profilePhotoInput2" accept="image/*" style="display:none">
+<div class="toast" id="toast"></div>
+
+<script>
+let APP={members:[],tasks:[],notifications:{},announcements:[],taskCounter:1001,currentUser:null,filter:'all',sessionToken:''};
+let liveRefreshTimer=null;
+let selectedAnnouncementType='Announcement';
+let isLoading=false;
+
+
+/* =========================================================
+   SUPABASE BRIDGE - replaces Google Apps Script bridge
+   Keeps the existing UI and function names unchanged.
+   ========================================================= */
+
+function sbError(error) {
+  return new Error(error?.message || error?.error_description || 'Supabase request failed.');
+}
+
+function getSessionToken(){return APP.sessionToken || localStorage.getItem('taskCommandSession') || '';}
+
+function normalizeSupabaseData(data) {
+  const out = data || {};
+  const notifications = {};
+  (out.notifications || []).forEach(n => {
+    const user = String(n.user_name || '').trim();
+    if (!user) return;
+    if (!notifications[user]) notifications[user] = [];
+    notifications[user].push({
+      message: n.message || '',
+      type: n.type || 'Update',
+      createdAt: n.created_at || '',
+      read: !!n.read
+    });
+  });
+  return {
+    members: out.members || [],
+    tasks: out.tasks || [],
+    notifications,
+    announcements: out.announcements || [],
+    taskCounter: Number(out.task_counter || 1001),
+    currentUser: out.current_user || null,
+    isOwner: !!out.is_owner
+  };
+}
+
+async function supabaseCall(action, payload = {}) {
+  let rpcName = '';
+  let params = {};
+
+  switch (action) {
+    case 'login':
+      rpcName = 'login_employee';
+      params = {
+        p_login_id: payload.employeeId || '',
+        p_password: payload.password || '',
+        p_department: payload.department || ''
+      };
+      break;
+
+    case 'getData':
+      rpcName = 'get_app_data';
+      params = { p_employee_id: payload.employeeId || '', p_session_token: payload.sessionToken || getSessionToken() };
+      break;
+
+    case 'getLiveUpdates':
+      rpcName = 'get_live_updates';
+      params = { p_employee_id: payload.employeeId || '', p_session_token: payload.sessionToken || getSessionToken() };
+      break;
+
+    case 'updateTaskStatus':
+      rpcName = 'update_task_status';
+      params = {
+        p_employee_id: payload.employeeId || '',
+        p_session_token: payload.sessionToken || getSessionToken(),
+        p_task_id: payload.taskId || '',
+        p_status: payload.status || 'Pending'
+      };
+      break;
+
+    case 'createTask':
+      rpcName = 'create_task';
+      params = {
+        p_employee_id: payload.employeeId || '',
+        p_session_token: payload.sessionToken || getSessionToken(),
+        p_task_type: payload.taskType || '',
+        p_assigned_to: payload.assignedTo || '',
+        p_priority: payload.priority || 'Medium',
+        p_deadline: payload.deadline || null,
+        p_reminder: payload.reminder || null,
+        p_description: payload.description || '',
+        p_file_url: payload.fileUrl || '',
+        p_department: payload.taskDepartment || payload.department || 'Other',
+        p_follow_up: payload.followUpTo || ''
+      };
+      break;
+
+    case 'createAnnouncement':
+      rpcName = 'create_announcement';
+      params = {
+        p_employee_id: payload.employeeId || '',
+        p_session_token: payload.sessionToken || getSessionToken(),
+        p_title: payload.title || '',
+        p_description: payload.description || '',
+        p_type: payload.type || 'Announcement',
+        p_file_url: payload.fileUrl || ''
+      };
+      break;
+
+    case 'getTaskReport':
+      rpcName = 'get_task_report';
+      params = {
+        p_employee_id: payload.employeeId || '',
+        p_session_token: payload.sessionToken || getSessionToken(),
+        p_employee: payload.employee || 'ALL',
+        p_period: payload.period || 'all'
+      };
+      break;
+
+    case 'saveAll':
+      rpcName = 'save_all';
+      params = {
+        p_employee_id: payload.employeeId || '',
+        p_session_token: payload.sessionToken || getSessionToken(),
+        p_members: payload.members || [],
+        p_tasks: payload.tasks || [],
+        p_notifications: payload.notifications || {},
+        p_task_counter: Number(payload.taskCounter || 1001)
+      };
+      break;
+
+    case 'updateOwnProfile':
+      rpcName = 'update_own_profile';
+      params = {
+        p_employee_id: payload.employeeId || '',
+        p_session_token: payload.sessionToken || getSessionToken(),
+        p_email: payload.email || '',
+        p_phone: payload.phone || '',
+        p_photo: payload.photo || null
+      };
+      break;
+
+    default:
+      throw new Error('Unknown Supabase action: ' + action);
+  }
+
+  const { data, error } = await supabaseClient.rpc(rpcName, params);
+  if (error) throw sbError(error);
+
+  if (action === 'getData' || action === 'getLiveUpdates') {
+    return normalizeSupabaseData(data);
+  }
+
+  if (action === 'login') {
+    return data || { ok: false, message: 'Invalid login.' };
+  }
+
+  return data || { ok: true };
+}
+
+function api(action, payload = {}) {
+  return supabaseCall(action, payload);
+}
+
+function direct(name, payload = {}) {
+  return supabaseCall(name, payload);
+}
+
+async function uploadFile(file, action, nameOverride) {
+  if (!file) throw new Error('No file selected.');
+  if (file.size > 8 * 1024 * 1024) {
+    throw new Error('File is larger than 8 MB.');
+  }
+
+  if (action === 'uploadPhoto' && !isOwner()) {
+    throw new Error('Only the Owner can change profile photos.');
+  }
+
+  const bucket = action === 'uploadPhoto' ? 'avatars' : 'task-attachments';
+  const safeName = String(nameOverride || file.name || 'file')
+    .replace(/[^a-zA-Z0-9._-]/g, '_')
+    .slice(0, 100);
+
+  const userPart = APP.currentUser?.employeeId || 'public';
+  const path = `${userPart}/${Date.now()}-${safeName}`;
+
+  const { data, error } = await supabaseClient.storage
+    .from(bucket)
+    .upload(path, file, {
+      cacheControl: '3600',
+      upsert: false,
+      contentType: file.type || undefined
+    });
+
+  if (error) throw sbError(error);
+
+  const { data: publicData } =
+    supabaseClient.storage.from(bucket).getPublicUrl(data.path);
+
+  if (!publicData?.publicUrl) {
+    throw new Error('Storage uploaded, but public URL was not created.');
+  }
+
+  return publicData.publicUrl;
+}
+
+async function persist() {
+  return api('saveAll', {
+    employeeId: APP.currentUser?.employeeId,
+    members: APP.members,
+    tasks: APP.tasks,
+    notifications: APP.notifications,
+    taskCounter: APP.taskCounter
+  });
+}
+
+function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2600)}
+function safeRich(s){return String(s??'').replace(/<script[\s\S]*?<\/script>/gi,'').replace(/<style[\s\S]*?<\/style>/gi,'')}
+function escapeHtml(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]))}
+function initials(name){return String(name||'E').trim().split(/\s+/).map(x=>x[0]).join('').substring(0,2).toUpperCase()||'E'}
+function isOwner(m=APP.currentUser){const r=String(m?.role||'').trim().toLowerCase();return r==='owner'||r==='admin'}
+
+async function init(){
+  const saved=localStorage.getItem('taskCommandUserId');
+  const session=localStorage.getItem('taskCommandSession');
+  if(saved&&session){
+    APP.sessionToken=session;
+    try{
+      const fresh=await direct('getData',{employeeId:saved,sessionToken:session});
+      if(fresh?.currentUser){
+        APP={...APP,...fresh,sessionToken:session};
+        startSession(fresh.currentUser);
+      }else{
+        localStorage.removeItem('taskCommandUserId');
+        localStorage.removeItem('taskCommandSession');
+      }
+    }catch(e){
+      localStorage.removeItem('taskCommandUserId');
+      localStorage.removeItem('taskCommandSession');
+      APP.sessionToken='';
+    }
+  }
+}
+async function login(){
+  const employeeId=document.getElementById('loginEmployeeId').value.trim(),
+        password=document.getElementById('loginPassword').value,
+        department=document.getElementById('loginDepartmentSelect').value;
+  if(!employeeId||!password||!department){
+    showLoginError('Please enter Employee ID, password and select department.');
+    return;
+  }
+  const btn=document.querySelector('#loginScreen .btn-primary');
+  if(btn)btn.disabled=true;
+  try{
+    const result=await direct('login',{employeeId,password,department});
+    if(!result?.ok){
+      showLoginError(result?.message||'Invalid login.');
+      return;
+    }
+    APP.sessionToken=result.sessionToken||'';
+    if(APP.sessionToken)localStorage.setItem('taskCommandSession',APP.sessionToken);
+    const fresh=await direct('getData',{
+      employeeId:result.member.employeeId,
+      sessionToken:APP.sessionToken
+    });
+    APP={...APP,...fresh,sessionToken:APP.sessionToken};
+    startSession(fresh.currentUser||result.member);
+    document.getElementById('loginPassword').value='';
+  }catch(e){
+    showLoginError(e.message||String(e));
+  }finally{
+    if(btn)btn.disabled=false;
+  }
+}
+function startSession(m){APP.currentUser=m;APP.filter=isOwner(m)?'all':'my';localStorage.setItem('taskCommandUserId',m.employeeId||'');if(APP.sessionToken)localStorage.setItem('taskCommandSession',APP.sessionToken);document.getElementById('loginScreen').style.display='none';document.getElementById('appDashboard').style.display='flex';applyRoleUI();updateProfileUI();renderAll();startLiveRefresh();document.getElementById('currentPageTitle').textContent=isOwner(m)?'Dashboard':'My Tasks';document.getElementById('taskTableHeading').textContent=isOwner(m)?'Live Task List':'My Tasks';toast('Welcome, '+m.name)}
+function applyRoleUI(){const owner=isOwner();document.querySelectorAll('.owner-only').forEach(el=>el.classList.toggle('hidden-by-role',!owner));document.querySelectorAll('.photo-upload-overlay').forEach(el=>el.style.display=owner?'flex':'none');const dash=document.getElementById('dashboardNav');if(dash)dash.classList.toggle('hidden-by-role',!owner);}
+function logout(){stopLiveRefresh();localStorage.removeItem('taskCommandUserId');localStorage.removeItem('taskCommandSession');APP.currentUser=null;APP.sessionToken='';document.getElementById('appDashboard').style.display='none';document.getElementById('loginScreen').style.display='flex';document.getElementById('loginEmployeeId').value='';document.getElementById('loginPassword').value='';document.getElementById('loginDepartmentSelect').value=''}
+function showLoginError(msg){const e=document.getElementById('loginError');e.textContent=msg;e.style.display='block'}
+async function loadData(silent=false){if(!APP.currentUser||isLoading)return;isLoading=true;try{const data=await direct('getData',{employeeId:APP.currentUser.employeeId});APP={...APP,...data};APP.currentUser=data.currentUser||APP.currentUser;applyRoleUI();renderAll();updateProfileUI();if(!silent)toast('Data refreshed')}catch(e){if(!silent)toast(e.message||e)}finally{isLoading=false}}
+async function loadLive(silent=true){if(!APP.currentUser||isLoading)return;isLoading=true;try{const data=await direct('getLiveUpdates',{employeeId:APP.currentUser.employeeId});APP.tasks=data.tasks||[];APP.notifications=data.notifications||{};APP.announcements=data.announcements||APP.announcements;renderTasks();renderNotifications();renderAnnouncements();if(!silent)toast('Updated')}catch(e){}finally{isLoading=false}}
+function startLiveRefresh(){stopLiveRefresh();liveRefreshTimer=setInterval(()=>{if(document.visibilityState==='visible'){renderGreeting();loadLive(true)}},3000)}
+function stopLiveRefresh(){if(liveRefreshTimer)clearInterval(liveRefreshTimer);liveRefreshTimer=null}
+function renderAll(){populateAssignees();renderDashboardStats();renderGreeting();renderTasks();renderMembers();renderTeamList();renderNotifications();renderAnnouncements();renderReportSummary()}
+function populateAssignees(){const selects=[document.getElementById('fullAssignee'),document.getElementById('quickAssignee'),document.getElementById('fullFollowUp')];selects.forEach(sel=>{if(!sel)return;const old=sel.multiple?getSelectedAssignees():sel.value;const prefix=sel.id==='fullFollowUp'?'<option value="">-- No Follow-up --</option>':'<option value="">-- Select Member --</option>';sel.innerHTML=prefix+APP.members.map(m=>`<option value="${escapeHtml(m.name)}">${escapeHtml(m.name)}</option>`).join('');if(Array.isArray(old))old.forEach(v=>{const o=Array.from(sel.options).find(x=>String(x.value).toLowerCase()===String(v).toLowerCase());if(o)o.selected=true});else if(old)sel.value=old});renderAssigneePicker();const report=document.getElementById('reportEmployee');if(report){const old=report.value;report.innerHTML='<option value="ALL">All Employees</option>'+APP.members.map(m=>`<option value="${escapeHtml(m.name)}">${escapeHtml(m.name)}</option>`).join('');if(isOwner()){report.disabled=false;if(old)report.value=old}else{report.innerHTML=`<option value="${escapeHtml(APP.currentUser?.name||'')}">${escapeHtml(APP.currentUser?.name||'My Tasks')}</option>`;report.value=APP.currentUser?.name||'';report.disabled=true}}}
+function switchTaskFilter(filter,title,el){if(!isOwner()&&filter==='all'){filter='my';title='My Tasks'}APP.filter=filter;document.getElementById('currentPageTitle').textContent=title;document.getElementById('taskTableHeading').textContent=title==='Dashboard'?'Live Task List':title;document.querySelectorAll('.nav-item').forEach(x=>x.classList.remove('active'));if(el)el.classList.add('active');showPage('dashboard-page');renderTasks();closeSidebar()}
+function switchPage(id,title,el){if(id==='add-member-page'&&!isOwner()){toast('Member management is Owner only.');return}document.getElementById('currentPageTitle').textContent=title;document.querySelectorAll('.nav-item').forEach(x=>x.classList.remove('active'));if(el)el.classList.add('active');showPage(id);closeSidebar()}
+function showPage(id){document.querySelectorAll('.modal-page').forEach(x=>x.classList.remove('active'));document.getElementById(id)?.classList.add('active')}
+function closeSidebar(){document.getElementById('sidebar').classList.remove('open');document.getElementById('sidebarOverlay').classList.remove('active')}
+function toggleSidebar(){document.getElementById('sidebar').classList.toggle('open');document.getElementById('sidebarOverlay').classList.toggle('active')}
+function renderTasks(){
+  let tasks=[...(APP.tasks||[])];const me=APP.currentUser?.name;
+  if(!isOwner())tasks=tasks.filter(t=>taskAssignedToMe(t,me));
+  else if(APP.filter==='my')tasks=tasks.filter(t=>taskAssignedToMe(t,me));
+  if(APP.filter==='in-progress')tasks=tasks.filter(t=>String(t.status).toLowerCase()==='in progress');
+  if(APP.filter==='pending')tasks=tasks.filter(t=>String(t.status).toLowerCase()==='pending');
+  if(APP.filter==='open')tasks=tasks.filter(t=>String(t.status).toLowerCase()!=='completed');
+  if(APP.filter==='completed')tasks=tasks.filter(t=>String(t.status).toLowerCase()==='completed');
+  const body=document.getElementById('dashboardTaskTable'),mobile=document.getElementById('mobileTaskList');
+  if(!tasks.length){body.innerHTML='<tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:30px">No tasks found.</td></tr>';mobile.innerHTML='<div style="text-align:center;color:var(--text-muted);padding:25px">No tasks found.</div>';return}
+  body.innerHTML=tasks.map(t=>{const overdue=t.deadline&&new Date(t.deadline+'T23:59:59')<new Date()&&String(t.status).toLowerCase()!=='completed';const p=String(t.priority||'Medium').toLowerCase();const status=t.status||'Pending';return `<tr class="task-row" onclick="openTaskDetails('${escapeHtml(t.id)}')"><td><b>${escapeHtml(t.id)}</b></td><td>${escapeHtml(t.taskType)}<div style="font-size:10px;color:var(--text-muted);margin-top:3px">${escapeHtml(t.taskDepartment||t.department||'Other')}</div></td><td>${escapeHtml(taskAssignedToText(t))}</td><td><span class="badge badge-${p}">${escapeHtml(t.priority)}</span></td><td>${escapeHtml(t.deadline||'—')}${overdue?' <span class="status-overdue">OVERDUE</span>':''}</td><td onclick="event.stopPropagation()"><select onchange="changeTaskStatus('${escapeHtml(t.id)}',this.value)" style="padding:5px;border:1px solid var(--border);border-radius:6px"><option ${status==='Pending'?'selected':''}>Pending</option><option ${status==='In Progress'?'selected':''}>In Progress</option><option ${status==='Completed'?'selected':''}>Completed</option></select></td><td>${escapeHtml(t.completedAt||'—')}</td><td onclick="event.stopPropagation()">${t.fileUrl?`<a class="btn-sm btn-success" href="${escapeHtml(t.fileUrl)}" target="_blank"><i class="fas fa-paperclip"></i></a>`:''}${isOwner()?`<button class="btn-sm btn-edit" onclick="editTask('${escapeHtml(t.id)}')"><i class="fas fa-pen"></i></button><button class="btn-sm btn-delete" onclick="deleteTask('${escapeHtml(t.id)}')"><i class="fas fa-trash"></i></button>`:''}</td></tr>`}).join('');
+  mobile.innerHTML=tasks.map(t=>{const overdue=t.deadline&&new Date(t.deadline+'T23:59:59')<new Date()&&String(t.status).toLowerCase()!=='completed';const status=t.status||'Pending';return `<div class="mobile-task-card" onclick="openTaskDetails('${escapeHtml(t.id)}')"><div class="mobile-task-top"><div><div class="mobile-task-title">${escapeHtml(t.taskType)}</div><div class="mobile-task-id">${escapeHtml(t.id)} • ${escapeHtml(taskAssignedToText(t))} • ${escapeHtml(t.taskDepartment||t.department||'Other')}</div></div><span class="badge badge-${String(t.priority||'Medium').toLowerCase()}">${escapeHtml(t.priority)}</span></div><div class="mobile-task-meta"><div><span>Deadline</span><b>${escapeHtml(t.deadline||'—')}</b>${overdue?' <span class="status-overdue">OVERDUE</span>':''}</div><div><span>Assigned By</span><b>${escapeHtml(t.createdByName||'—')}</b></div></div><div class="mobile-task-bottom" onclick="event.stopPropagation()"><select onchange="changeTaskStatus('${escapeHtml(t.id)}',this.value)"><option ${status==='Pending'?'selected':''}>Pending</option><option ${status==='In Progress'?'selected':''}>In Progress</option><option ${status==='Completed'?'selected':''}>Completed</option></select><button onclick="openTaskDetails('${escapeHtml(t.id)}')"><i class="fas fa-eye"></i></button></div></div>`}).join('');
+  renderDashboardStats();
+}
+async function changeTaskStatus(id,status){const t=APP.tasks.find(x=>x.id===id);if(!t)return;const old={status:t.status,completedAt:t.completedAt};t.status=status;t.completedAt=status==='Completed'?new Date().toISOString():'';renderTasks();try{await api('updateTaskStatus',{employeeId:APP.currentUser.employeeId,taskId:id,status});toast('Task status updated');await loadLive(true)}catch(e){t.status=old.status;t.completedAt=old.completedAt;renderTasks();toast(e.message||String(e))}}
+function openTaskDetails(id){const t=APP.tasks.find(x=>x.id===id);if(!t)return;document.getElementById('detailTaskId').textContent=t.id||'TASK';document.getElementById('detailTaskTitle').textContent=t.taskType||'Task Details';document.getElementById('detailAssignedTo').textContent=taskAssignedToText(t)||'—';document.getElementById('detailAssignedBy').textContent=t.createdByName||t.createdBy||'—';document.getElementById('detailFollowUp').textContent=t.followUpTo||'—';document.getElementById('detailDepartment').textContent=t.taskDepartment||t.department||'—';document.getElementById('detailPriority').textContent=t.priority||'—';document.getElementById('detailDeadline').textContent=t.deadline||'—';document.getElementById('detailStatus').textContent=t.status||'—';document.getElementById('detailCreated').textContent=t.createdAt?new Date(t.createdAt).toLocaleString():'—';document.getElementById('detailReminder').textContent=t.reminder||'—';document.getElementById('detailCompleted').textContent=t.completedAt?new Date(t.completedAt).toLocaleString():'—';document.getElementById('detailDescription').innerHTML=safeRich(t.description)||'<span style="color:var(--text-muted)">No description provided.</span>';const a=document.getElementById('detailFile');a.style.display=t.fileUrl?'inline-block':'none';if(t.fileUrl)a.href=t.fileUrl;document.getElementById('taskDetailsModal').classList.add('show')}
+function closeTaskDetails(){document.getElementById('taskDetailsModal').classList.remove('show')}
+function editTask(id){if(!isOwner())return;const t=APP.tasks.find(x=>x.id===id);if(!t)return;document.getElementById('editTaskId').value=t.id;document.getElementById('fullTaskDepartment').value=t.taskDepartment||t.department||'';document.getElementById('fullTaskType').value=t.taskType;setSelectedAssignees(t.assignedTo);document.getElementById('fullPriority').value=t.priority;document.getElementById('fullDeadline').value=t.deadline||'';document.getElementById('fullReminder').value=t.reminder||'';document.getElementById('fullFollowUp').value=t.followUpTo||'';document.getElementById('fullDescription').innerHTML=t.description||'';document.getElementById('taskFormTitle').innerHTML='<i class="fas fa-pen"></i> Edit Task';document.getElementById('saveTaskBtn').innerHTML='<i class="fas fa-save"></i> Update Task';showPage('assign-task-page');document.getElementById('currentPageTitle').textContent='Edit Task'}
+async function deleteTask(id){if(!isOwner()||!confirm('Delete this task?'))return;APP.tasks=APP.tasks.filter(t=>t.id!==id);await persist();renderTasks();toast('Task deleted')}
+function getSelectedAssignees(){const sel=document.getElementById('fullAssignee');if(!sel)return [];return Array.from(sel.selectedOptions).map(o=>o.value).filter(Boolean)}
+function renderAssigneePicker(){const menu=document.getElementById('multiAssigneeMenu');if(!menu)return;const selected=new Set(getSelectedAssignees().map(x=>String(x).toLowerCase()));if(!APP.members.length){menu.innerHTML='<div class="assignee-empty">No team members available.</div>';updateAssigneePickerLabel();return}menu.innerHTML=APP.members.map(m=>{const name=String(m.name||'').trim();if(!name)return '';const checked=selected.has(name.toLowerCase())?'checked':'';return `<label class="assignee-option"><input type="checkbox" value="${escapeHtml(name)}" ${checked} onchange="onAssigneeCheckboxChange(this)"><span>${escapeHtml(name)}</span></label>`}).join('');updateAssigneePickerLabel()}
+function updateAssigneePickerLabel(){const names=getSelectedAssignees();const text=document.getElementById('multiAssigneeText');const count=document.getElementById('assigneeSelectedCount');if(!text||!count)return;if(!names.length){text.textContent='-- Select Member --';count.innerHTML='<i class="fas fa-users"></i> Select one or more employees';return}text.textContent=names.length===1?names[0]:names.length+' employees selected';count.innerHTML='<i class="fas fa-check-circle"></i> '+names.length+' employee'+(names.length===1?'':'s')+' selected'}
+function onAssigneeCheckboxChange(cb){const sel=document.getElementById('fullAssignee');const option=Array.from(sel.options).find(o=>String(o.value).toLowerCase()===String(cb.value).toLowerCase());if(option)option.selected=cb.checked;updateAssigneePickerLabel()}
+function toggleAssigneePicker(e){if(e)e.stopPropagation();const wrap=document.getElementById('multiAssignee');if(wrap)wrap.classList.toggle('open')}
+function closeAssigneePicker(){const wrap=document.getElementById('multiAssignee');if(wrap)wrap.classList.remove('open')}
+function setSelectedAssignees(value){const names=Array.isArray(value)?value:String(value||'').split(/\s*[,|]\s*/).map(x=>x.trim()).filter(Boolean);const sel=document.getElementById('fullAssignee');if(!sel)return;Array.from(sel.options).forEach(o=>o.selected=names.some(n=>String(n).toLowerCase()===String(o.value).toLowerCase()));renderAssigneePicker();}
+
+function taskAssignees(t){
+  if(Array.isArray(t.assignedTo)) return t.assignedTo;
+  return String(t.assignedTo||'').split(/\s*[,|]\s*/).map(x=>x.trim()).filter(Boolean);
+}
+function taskAssignedToText(t){ return taskAssignees(t).join(', '); }
+function taskAssignedToMe(t,name){ return taskAssignees(t).some(x=>String(x).trim().toLowerCase()===String(name||'').trim().toLowerCase()); }
+async function submitFullTask(e){e.preventDefault();const id=document.getElementById('editTaskId').value;const payload={employeeId:APP.currentUser.employeeId,taskDepartment:document.getElementById('fullTaskDepartment').value,taskType:document.getElementById('fullTaskType').value,assignedTo:getSelectedAssignees().join(', '),followUpTo:document.getElementById('fullFollowUp').value,priority:document.getElementById('fullPriority').value,deadline:document.getElementById('fullDeadline').value,reminder:document.getElementById('fullReminder').value,description:document.getElementById('fullDescription').innerHTML};if(!payload.taskDepartment){toast('Please select a department.');return}if(!payload.assignedTo){toast('Please select at least one team member.');return}const f=document.getElementById('fullTaskFile').files[0];try{if(f)payload.fileUrl=await uploadFile(f,'uploadTaskFile');if(id&&isOwner()){const t=APP.tasks.find(x=>x.id===id);Object.assign(t,payload,{id:id,createdBy:t.createdBy,createdByName:t.createdByName,department:payload.taskDepartment,taskDepartment:payload.taskDepartment,updatedAt:new Date().toISOString()});await persist();toast('Task updated')}else{await api('createTask',payload);toast(taskAssignees({assignedTo:payload.assignedTo}).includes(APP.currentUser.name)?'Task created':'Task assigned successfully')}resetTaskForm();await loadData(true);showPage('dashboard-page');document.getElementById('currentPageTitle').textContent=isOwner()?'Dashboard':'My Tasks'}catch(err){toast(err.message||String(err))}}
+async function createQuickTask(){const title=document.getElementById('quickTitle').value.trim(),assignee=document.getElementById('quickAssignee').value,due=document.getElementById('quickDueDate').value,department=document.getElementById('quickDepartment').value;if(!title||!assignee||!due||!department){toast('Enter title, department, member and due date');return}try{await api('createTask',{employeeId:APP.currentUser.employeeId,taskType:title,taskDepartment:department,assignedTo:assignee,priority:document.getElementById('quickPriority').value,deadline:due,reminder:'',description:'',fileUrl:''});document.getElementById('quickTitle').value='';document.getElementById('quickDepartment').value='';await loadData(true);toast('Task added')}catch(e){toast(e.message||String(e))}}
+function resetTaskForm(){document.getElementById('editTaskId').value='';document.getElementById('fullTaskDepartment').value='';document.getElementById('fullTaskType').value='';Array.from(document.getElementById('fullAssignee').options).forEach(o=>o.selected=false);renderAssigneePicker();closeAssigneePicker();document.getElementById('fullFollowUp').value='';document.getElementById('fullPriority').value='Medium';document.getElementById('fullDeadline').value='';document.getElementById('fullReminder').value='';document.getElementById('fullDescription').innerHTML='';document.getElementById('fullTaskFile').value='';document.getElementById('taskFormTitle').innerHTML='<i class="fas fa-tasks"></i> Assign New Task';document.getElementById('saveTaskBtn').innerHTML='<i class="fas fa-paper-plane"></i> Assign Task'}
+function renderDashboardStats(){const all=APP.tasks||[];const open=all.filter(t=>String(t.status||'Pending').toLowerCase()!=='completed').length;const pending=all.filter(t=>String(t.status||'Pending').toLowerCase()==='pending').length;const progress=all.filter(t=>String(t.status||'').toLowerCase()==='in progress').length;const completed=all.filter(t=>String(t.status||'').toLowerCase()==='completed').length;[['countOpen',open],['countPending',pending],['countProgress',progress],['countCompleted',completed]].forEach(([id,n])=>{const el=document.getElementById(id);if(el)el.textContent=n})}
+function renderGreeting(){const m=APP.currentUser;if(!m)return;const h=new Date().getHours();const greeting=h<12?'Good Morning':h<17?'Good Afternoon':'Good Evening';const el=document.getElementById('greetingText');const sub=document.getElementById('greetingSubtext');const dept=document.getElementById('dashboardDepartment');if(el)el.textContent=greeting+', '+m.name+' 👋';if(sub)sub.textContent=isOwner(m)?'Here is your team task overview for today.':'Here is your personal task overview for today.';if(dept)dept.textContent='Department: '+(m.department||'Other')}
+function openCountDetails(type){let filter='my';let title='My Tasks';if(type==='completed'){filter='completed';title='Completed'}else if(type==='in-progress'){filter='in-progress';title='In Progress'}else if(type==='pending'){filter='pending';title='Pending'}else if(type==='open'){filter='open';title='Open Tasks'}APP.filter=filter;document.getElementById('currentPageTitle').textContent=title;document.getElementById('taskTableHeading').textContent=title;showPage('dashboard-page');renderTasks()}
+
+function renderMembers(){const body=document.getElementById('memberTableBody');if(!body)return;body.innerHTML=APP.members.map((m,i)=>{const count=APP.tasks.filter(t=>taskAssignedToMe(t,m.name)&&String(t.status).toLowerCase()==='completed').length;return `<tr><td>${escapeHtml(m.name)}</td><td>${escapeHtml(m.role)}</td><td>${escapeHtml(m.email)}</td><td>${escapeHtml(m.phone)}</td><td>${escapeHtml(m.department||'—')}</td><td><b>${count}</b></td><td>${isOwner()?`<button class="btn-sm btn-edit" onclick="editMember(${i})">Edit</button><button class="btn-sm btn-delete" onclick="deleteMember(${i})">Delete</button>`:'View only'}</td></tr>`}).join('')||'<tr><td colspan="7" style="text-align:center;color:var(--text-muted)">No members yet.</td></tr>'}
+function renderTeamList(){const el=document.getElementById('teamList');if(!el)return;el.innerHTML=APP.members.map(m=>`<div class="team-person"><div class="team-avatar">${m.photo?`<img src="${escapeHtml(m.photo)}">`:initials(m.name)}</div><div><h4>${escapeHtml(m.name)}</h4><p>${escapeHtml(m.role||'Team Member')}</p><span class="dept">${escapeHtml(m.department||'Other')}</span></div></div>`).join('')||'<p style="color:var(--text-muted)">No team members.</p>'}
+async function saveMember(e){e.preventDefault();if(!isOwner()){toast('Only the Owner can manage members.');return}const i=Number(document.getElementById('editMemberIndex').value),name=document.getElementById('memberName').value.trim();const m={name,role:document.getElementById('memberRole').value.trim(),email:document.getElementById('memberEmail').value.trim(),phone:document.getElementById('memberPhone').value.trim(),photo:'',employeeId:name.toLowerCase().replace(/\s+/g,''),password:name.toLowerCase().replace(/\s+/g,'')+'@123',department:document.getElementById('memberDepartment').value,joiningDate:new Date().toISOString().slice(0,10),updatedAt:new Date().toISOString()};if(i>=0){m.photo=APP.members[i].photo||'';m.employeeId=APP.members[i].employeeId||m.employeeId;m.password=APP.members[i].password||m.password;APP.members[i]=m}else APP.members.push(m);try{await persist();renderAll();e.target.reset();document.getElementById('editMemberIndex').value=-1;toast(i>=0?'Member updated':'Member added')}catch(err){toast(err.message||err)}}
+function editMember(i){if(!isOwner())return;const m=APP.members[i];document.getElementById('editMemberIndex').value=i;document.getElementById('memberName').value=m.name;document.getElementById('memberRole').value=m.role;document.getElementById('memberEmail').value=m.email;document.getElementById('memberPhone').value=m.phone;document.getElementById('memberDepartment').value=String(m.department||'').toLowerCase()}
+async function deleteMember(i){if(!isOwner()||!confirm('Delete this member?'))return;APP.members.splice(i,1);try{await persist();renderAll();toast('Member deleted')}catch(e){toast(e.message||String(e))}}
+function addNotification(user,message,type){if(!APP.notifications[user])APP.notifications[user]=[];APP.notifications[user].unshift({message,type,createdAt:new Date().toISOString(),read:false})}
+function renderNotifications(){const list=APP.notifications?.[APP.currentUser?.name]||[];const unread=list.filter(x=>!x.read).length;document.getElementById('notifCount').textContent=unread;document.getElementById('notifList').innerHTML=list.length?list.slice(0,25).map(n=>`<div class="notif-item"><b>${escapeHtml(n.type||'Update')}</b> — ${escapeHtml(n.message)}<br><small style="color:var(--text-muted)">${new Date(n.createdAt).toLocaleString()}</small></div>`).join(''):'<p style="font-size:.75rem;color:var(--text-muted);text-align:center;padding:10px">No new notifications</p>'}
+function toggleNotificationDropdown(){document.getElementById('notifDropdown').classList.toggle('show');const list=APP.notifications?.[APP.currentUser?.name]||[];list.forEach(n=>n.read=true);renderNotifications()}
+function renderAnnouncements(){const list=APP.announcements||[];const el=document.getElementById('announcementList');if(!el)return;if(!list.length){el.innerHTML='<div class="announcement-empty">No announcements yet. Stay tuned for company updates.</div>';return}el.innerHTML=list.slice(0,10).map(a=>`<div class="announcement-card"><div class="ann-type">${escapeHtml(a.type)} • ${escapeHtml(a.createdByName||'Admin')}</div><h4>${escapeHtml(a.title)}</h4><div class="ann-desc">${safeRich(a.description)}</div><small>${a.createdAt?new Date(a.createdAt).toLocaleString():''}${a.fileUrl?` • <a href="${escapeHtml(a.fileUrl)}" target="_blank" style="color:#fff;text-decoration:underline">Attachment</a>`:''}</small></div>`).join('')}
+function openAnnouncementModal(){if(!isOwner()){toast('Only Owner can post announcements.');return}document.getElementById('announcementModal').classList.add('show')}
+function closeAnnouncementModal(){document.getElementById('announcementModal').classList.remove('show')}
+function selectAnnouncementType(btn){document.querySelectorAll('.event-chip').forEach(x=>x.classList.remove('active'));btn.classList.add('active');selectedAnnouncementType=btn.dataset.type}
+function execAnnouncementCmd(cmd){document.execCommand(cmd,false,null);document.getElementById('annDescription').focus()}
+async function publishAnnouncement(){if(!isOwner())return;const title=document.getElementById('annTitle').value.trim(),description=document.getElementById('annDescription').innerHTML.trim();if(!title||!description){toast('Add a title and description.');return}const f=document.getElementById('annFile').files[0];const btn=document.getElementById('publishAnnouncementBtn');btn.disabled=true;try{let fileUrl='';if(f)fileUrl=await uploadFile(f,'uploadTaskFile','Announcement');await api('createAnnouncement',{employeeId:APP.currentUser.employeeId,title,description,type:selectedAnnouncementType,fileUrl});document.getElementById('annTitle').value='';document.getElementById('annDescription').innerHTML='';document.getElementById('annFile').value='';closeAnnouncementModal();await loadData(true);toast('Announcement published')}catch(e){toast(e.message||String(e))}finally{btn.disabled=false}}
+async function renderReportSummary(){const el=document.getElementById('reportSummary');if(!el||!APP.currentUser)return;try{const employee=isOwner()?((document.getElementById('reportEmployee')||{}).value||'ALL'):APP.currentUser.name;const period=(document.getElementById('reportPeriod')||{}).value||'all';const r=await api('getTaskReport',{employeeId:APP.currentUser.employeeId,employee,period});const tasks=r.tasks||[];const p=tasks.filter(t=>String(t.status).toLowerCase()==='pending').length;const ip=tasks.filter(t=>String(t.status).toLowerCase()==='in progress').length;const c=tasks.filter(t=>String(t.status).toLowerCase()==='completed').length;el.innerHTML=`<span class="summary-pill">Total: ${tasks.length}</span><span class="summary-pill">Pending: ${p}</span><span class="summary-pill">In Progress: ${ip}</span><span class="summary-pill">Completed: ${c}</span>`}catch(e){}}
+async function downloadBase64File(base64,mimeType,fileName){
+  const binary=atob(base64);
+  const bytes=new Uint8Array(binary.length);
+  for(let i=0;i<binary.length;i++)bytes[i]=binary.charCodeAt(i);
+  const blob=new Blob([bytes],{type:mimeType||'application/octet-stream'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;a.download=fileName||'TASK_COMMAND_REPORT';document.body.appendChild(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),1500);
+}
+async function downloadTaskReport(kind){
+  if(!APP.currentUser)return;
+  const buttons=document.querySelectorAll('.report-btn');
+  buttons.forEach(b=>b.disabled=true);
+  try{
+    const employee=isOwner()?((document.getElementById('reportEmployee')||{}).value||'ALL'):APP.currentUser.name;
+    const period=(document.getElementById('reportPeriod')||{}).value||'all';
+    const r=await api('getTaskReport',{employeeId:APP.currentUser.employeeId,employee,period});
+    const tasks=r.tasks||[];
+    const rows=tasks.map(t=>({
+      'Task ID':t.id||'',
+      'Task Type':t.taskType||'',
+      'Department':t.department||t.taskDepartment||'Other',
+      'Assigned To':taskAssignedToText(t),
+      'Assigned By':t.createdByName||'',
+      'Follow-up':t.followUpTo||'',
+      'Priority':t.priority||'Medium',
+      'Deadline':t.deadline||'',
+      'Status':t.status||'Pending',
+      'Created At':t.createdAt||'',
+      'Completed At':t.completedAt||''
+    }));
+    const stamp=new Date().toISOString().replace(/[:.]/g,'-').slice(0,19);
+    const base='TASK_COMMAND_'+String(employee||'ALL').replace(/[^a-z0-9]+/gi,'_')+'_'+period+'_'+stamp;
+
+    if(kind==='csv'){
+      const headers=Object.keys(rows[0]||{
+        'Task ID':'','Task Type':'','Department':'','Assigned To':'','Assigned By':'',
+        'Follow-up':'','Priority':'','Deadline':'','Status':'','Created At':'','Completed At':''
+      });
+      const csv=[headers.join(','),...rows.map(row=>headers.map(h=>{
+        const v=String(row[h]??'').replace(/"/g,'""');
+        return '"'+v+'"';
+      }).join(','))].join('\r\n');
+      const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
+      const url=URL.createObjectURL(blob);
+      const a=document.createElement('a');a.href=url;a.download=base+'.csv';a.click();
+      setTimeout(()=>URL.revokeObjectURL(url),1000);
+      toast('CSV downloaded — '+tasks.length+' task(s)');
+      return;
+    }
+
+    if(kind==='xlsx'){
+      if(!window.XLSX)throw new Error('Excel export library is not loaded. Refresh the page and try again.');
+      const ws=XLSX.utils.json_to_sheet(rows);
+      const wb=XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb,ws,'Task Report');
+      XLSX.writeFile(wb,base+'.xlsx');
+      toast('Excel downloaded — '+tasks.length+' task(s)');
+      return;
+    }
+
+    if(kind==='pdf'){
+      if(!window.jspdf?.jsPDF)throw new Error('PDF export library is not loaded. Refresh the page and try again.');
+      const doc=new jspdf.jsPDF({orientation:'landscape',unit:'pt',format:'a4'});
+      doc.setFontSize(20);
+      doc.setTextColor(23,59,143);
+      doc.text('TASK COMMAND',doc.internal.pageSize.getWidth()/2,38,{align:'center'});
+      doc.setFontSize(11);
+      doc.setTextColor(91,55,255);
+      doc.text('TASK PERFORMANCE REPORT',doc.internal.pageSize.getWidth()/2,56,{align:'center'});
+      doc.setFontSize(9);
+      doc.setTextColor(100,116,139);
+      doc.text('Employee: '+employee+'   •   Period: '+String(period).toUpperCase()+'   •   Generated: '+new Date().toLocaleString(),doc.internal.pageSize.getWidth()/2,72,{align:'center'});
+
+      const total=tasks.length;
+      const completed=tasks.filter(t=>String(t.status).toLowerCase()==='completed').length;
+      const pending=tasks.filter(t=>String(t.status).toLowerCase()==='pending').length;
+      const progress=tasks.filter(t=>String(t.status).toLowerCase()==='in progress').length;
+
+      doc.setFontSize(10);
+      doc.setTextColor(23,32,51);
+      doc.text('Total: '+total+'    Completed: '+completed+'    Pending: '+pending+'    In Progress: '+progress,40,96);
+
+      const head=[['TASK ID','TASK TYPE','DEPARTMENT','ASSIGNED TO','ASSIGNED BY','PRIORITY','DEADLINE','STATUS']];
+      const body=tasks.map(t=>[
+        t.id||'',
+        t.taskType||'',
+        t.department||t.taskDepartment||'Other',
+        taskAssignedToText(t),
+        t.createdByName||'—',
+        t.priority||'Medium',
+        t.deadline||'—',
+        t.status||'Pending'
+      ]);
+
+      if(typeof doc.autoTable==='function'){
+        doc.autoTable({
+          head,
+          body,
+          startY:110,
+          styles:{fontSize:7,cellPadding:4},
+          headStyles:{fillColor:[23,59,143],textColor:255},
+          alternateRowStyles:{fillColor:[247,249,252]}
+        });
+      }else{
+        let y=115;
+        doc.setFontSize(7);
+        head[0].forEach((h,i)=>doc.text(h,40+i*90,y));
+        y+=14;
+        body.forEach(row=>{
+          row.forEach((v,i)=>doc.text(String(v).slice(0,18),40+i*90,y));
+          y+=12;
+          if(y>550){doc.addPage();y=40;}
+        });
+      }
+
+      doc.save(base+'.pdf');
+      toast('PDF downloaded — '+tasks.length+' task(s)');
+      return;
+    }
+
+    throw new Error('Unknown report format.');
+  }catch(e){
+    toast(e.message||String(e));
+  }finally{
+    buttons.forEach(b=>b.disabled=false);
+  }
+}
+
+function updateProfileUI(){const m=APP.currentUser;if(!m)return;document.getElementById('userProfileName').textContent=m.name;document.getElementById('sidebarUserName').textContent=m.name;document.getElementById('sidebarUserRole').textContent=m.role||'Active User';document.getElementById('sidebarUserRole2').textContent=m.role||'Active User';document.getElementById('sidebarUserDepartment').textContent=m.department?('Department: '+m.department):'';document.getElementById('headerUserDepartment').textContent=m.department?('Department: '+m.department):'';const ld=document.getElementById('loginDepartment');if(ld){ld.textContent=m.department?'Department: '+m.department:'';ld.style.display=m.department?'block':'none'}setAvatar('headerAvatar',m);setAvatar('sidebarAvatar',m);fillProfile(m)}
+function setAvatar(id,m){const el=document.getElementById(id);if(!el)return;if(m.photo)el.innerHTML=`<img src="${escapeHtml(m.photo)}">`;else el.textContent=initials(m.name)}
+function fillProfile(m){document.getElementById('profileName').textContent=m.name;document.getElementById('profileRole').textContent=m.role||'Active User';document.getElementById('profileRole2').textContent=m.role||'Not added';document.getElementById('profilePhone').textContent=m.phone||'Not added';document.getElementById('profileEmail').textContent=m.email||'Not added';document.getElementById('profileEmployeeId').textContent=m.employeeId||'Not added';setAvatar('profileBigAvatar',m)}
+function openProfileModal(){if(APP.currentUser){fillProfile(APP.currentUser);document.getElementById('profileModal').classList.add('show')}}
+function closeProfileModal(){document.getElementById('profileModal').classList.remove('show');closeProfileEdit()}
+function toggleProfileEdit(){const p=document.getElementById('profileEditPanel');p.style.display=p.style.display==='none'?'block':'none';const m=APP.currentUser;if(m){document.getElementById('editProfileName').value=m.name;document.getElementById('editProfileRole').value=m.role;document.getElementById('editProfilePhone').value=m.phone;document.getElementById('editProfileEmail').value=m.email}}
+function closeProfileEdit(){document.getElementById('profileEditPanel').style.display='none'}
+async function saveProfileChanges(){const m=APP.currentUser;if(!m)return;try{const res=await api('updateOwnProfile',{employeeId:m.employeeId,role:m.role,phone:document.getElementById('editProfilePhone').value.trim(),email:document.getElementById('editProfileEmail').value.trim(),photo:m.photo||''});APP.currentUser=res.member;APP.members=APP.members.map(x=>x.employeeId===m.employeeId?res.member:x);updateProfileUI();closeProfileEdit();toast('Profile updated')}catch(e){toast(e.message||e)}}
+async function uploadProfilePhoto(e){const f=e.target.files[0];if(!f||!APP.currentUser)return;if(!isOwner()){toast('Only the Owner can change profile photos.');e.target.value='';return}try{const url=await uploadFile(f,'uploadPhoto',APP.currentUser.name);const res=await api('updateOwnProfile',{employeeId:APP.currentUser.employeeId,phone:APP.currentUser.phone,email:APP.currentUser.email,photo:url});APP.currentUser=res.member;APP.members=APP.members.map(x=>x.employeeId===APP.currentUser.employeeId?res.member:x);updateProfileUI();fillProfile(APP.currentUser);toast('Profile photo updated')}catch(err){toast(err.message||err)}e.target.value=''}
+function execCmd(cmd){document.execCommand(cmd,false,null);document.getElementById('fullDescription').focus()}
+document.addEventListener('keydown',e=>{if(e.key==='Enter'&&(document.activeElement===document.getElementById('loginEmployeeId')||document.activeElement===document.getElementById('loginPassword')))login();if(e.key==='Escape'){closeTaskDetails();closeAnnouncementModal()}});
+window.addEventListener('load',init);
+
+document.addEventListener('click',function(e){const wrap=document.getElementById('multiAssignee');if(wrap&&!wrap.contains(e.target))closeAssigneePicker();});
+</script>
+</body>
+</html>
