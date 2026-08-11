@@ -264,7 +264,73 @@ function escapeHtml(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;',
 function initials(name){return String(name||'E').trim().split(/\s+/).map(x=>x[0]).join('').substring(0,2).toUpperCase()||'E'}
 function isOwner(m=APP.currentUser){const r=String(m?.role||'').trim().toLowerCase();return r==='owner'||r==='admin'}
 
+function ensureFeatureUI(){
+  if(!document.getElementById('tcFeatureStyles')){
+    const s=document.createElement('style');
+    s.id='tcFeatureStyles';
+    s.textContent=`
+      .tc-kpi-card{border:2px solid rgba(22,119,255,.38)!important;box-shadow:0 8px 24px rgba(22,119,255,.08)!important}
+      .announcement-card{cursor:pointer;transition:.2s}
+      .announcement-card:hover{transform:translateY(-2px);box-shadow:0 12px 28px rgba(22,119,255,.14)}
+      .tc-modal{display:none;position:fixed;inset:0;background:rgba(2,8,28,.72);backdrop-filter:blur(8px);z-index:100000;align-items:center;justify-content:center;padding:20px}
+      .tc-modal.show{display:flex}
+      .tc-modal-card{width:min(720px,96vw);max-height:90vh;overflow:auto;background:#fff;border-radius:24px;box-shadow:0 30px 90px rgba(0,0,0,.35);padding:26px}
+      .tc-modal-head{display:flex;justify-content:space-between;align-items:center;gap:12px;border-bottom:1px solid #e5e7eb;padding-bottom:14px;margin-bottom:16px}
+      .tc-modal-close{border:0;width:38px;height:38px;border-radius:50%;cursor:pointer;background:#f1f5f9}
+      .tc-detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+      .tc-detail{padding:13px;border:1px solid #e5e7eb;border-radius:12px}
+      .tc-detail small{display:block;color:#64748b;text-transform:uppercase;font-size:10px;margin-bottom:4px}
+      .tc-detail b{word-break:break-word}
+      .team-person{cursor:pointer}
+      @media(max-width:600px){.tc-detail-grid{grid-template-columns:1fr}}
+    `;
+    document.head.appendChild(s);
+  }
+
+  if(!document.getElementById('announcementDetailsModal')){
+    const m=document.createElement('div');
+    m.id='announcementDetailsModal';m.className='tc-modal';
+    m.onclick=e=>{if(e.target===m)closeAnnouncementDetails()};
+    m.innerHTML=`<div class="tc-modal-card">
+      <div class="tc-modal-head"><div><div id="announcementDetailType" style="color:#1677ff;font-weight:800;font-size:12px"></div><h2 id="announcementDetailTitle" style="margin:5px 0 0"></h2></div><button class="tc-modal-close" onclick="closeAnnouncementDetails()">✕</button></div>
+      <div class="tc-detail-grid">
+        <div class="tc-detail"><small>Published By</small><b id="announcementDetailAuthor">—</b></div>
+        <div class="tc-detail"><small>Date / Time</small><b id="announcementDetailDate">—</b></div>
+      </div>
+      <div style="margin-top:16px;padding:16px;border:1px solid #e5e7eb;border-radius:14px"><div id="announcementDetailDescription"></div></div>
+      <a id="announcementDetailFile" class="btn-primary" style="display:none;margin-top:16px;text-decoration:none;text-align:center" target="_blank">Open Attachment</a>
+    </div>`;
+    document.body.appendChild(m);
+  }
+
+  if(!document.getElementById('employeePanelModal')){
+    const m=document.createElement('div');
+    m.id='employeePanelModal';m.className='tc-modal';
+    m.onclick=e=>{if(e.target===m)closeEmployeePanel()};
+    m.innerHTML=`<div class="tc-modal-card" style="max-width:560px">
+      <div class="tc-modal-head"><h2 style="margin:0">Employee Profile</h2><button class="tc-modal-close" onclick="closeEmployeePanel()">✕</button></div>
+      <div style="text-align:center">
+        <div id="employeePanelAvatar" style="width:96px;height:96px;border-radius:50%;margin:0 auto 12px;background:#1677ff;color:#fff;display:flex;align-items:center;justify-content:center;font-size:30px;font-weight:800;overflow:hidden"></div>
+        <h2 id="employeePanelName" style="margin:5px 0"></h2><p id="employeePanelRole" style="color:#64748b"></p>
+      </div>
+      <div class="tc-detail-grid" style="margin-top:18px">
+        <div class="tc-detail"><small>Employee ID</small><b id="employeePanelId">—</b></div>
+        <div class="tc-detail"><small>Department</small><b id="employeePanelDepartment">—</b></div>
+        <div class="tc-detail"><small>Email</small><b id="employeePanelEmail">—</b></div>
+        <div class="tc-detail"><small>Phone</small><b id="employeePanelPhone">—</b></div>
+      </div>
+      <div style="margin-top:16px;color:#64748b;font-size:12px;text-align:center">For security, clicking another employee does not silently log in as that employee.</div>
+    </div>`;
+    document.body.appendChild(m);
+  }
+
+  // Give KPI cards a blue highlighted border without changing the layout.
+  document.querySelectorAll('[id*="count"],.kpi-card,.stat-card,.dashboard-kpi').forEach(el=>{
+    if(el.closest('.kpi-card,.stat-card,.dashboard-kpi')) el.closest('.kpi-card,.stat-card,.dashboard-kpi').classList.add('tc-kpi-card');
+  });
+}
 async function init(){
+  ensureFeatureUI();
   const saved=localStorage.getItem('taskCommandUserId');
   const session=localStorage.getItem('taskCommandSession');
   if(saved&&session){
@@ -317,7 +383,7 @@ async function login(){
   }
 }
 function startSession(m){APP.currentUser=m;APP.filter=isOwner(m)?'all':'my';localStorage.setItem('taskCommandUserId',m.employeeId||'');if(APP.sessionToken)localStorage.setItem('taskCommandSession',APP.sessionToken);document.getElementById('loginScreen').style.display='none';document.getElementById('appDashboard').style.display='flex';applyRoleUI();updateProfileUI();renderAll();startLiveRefresh();document.getElementById('currentPageTitle').textContent=isOwner(m)?'Dashboard':'My Tasks';document.getElementById('taskTableHeading').textContent=isOwner(m)?'Live Task List':'My Tasks';toast('Welcome, '+m.name)}
-function applyRoleUI(){const owner=isOwner();document.querySelectorAll('.owner-only').forEach(el=>el.classList.toggle('hidden-by-role',!owner));document.querySelectorAll('.photo-upload-overlay').forEach(el=>el.style.display=owner?'flex':'none');const dash=document.getElementById('dashboardNav');if(dash)dash.classList.toggle('hidden-by-role',!owner);}
+function applyRoleUI(){const owner=isOwner();document.querySelectorAll('.owner-only').forEach(el=>el.classList.toggle('hidden-by-role',!owner));document.querySelectorAll('.photo-upload-overlay').forEach(el=>el.style.display='flex');const dash=document.getElementById('dashboardNav');if(dash)dash.classList.toggle('hidden-by-role',!owner);}
 function logout(){stopLiveRefresh();localStorage.removeItem('taskCommandUserId');localStorage.removeItem('taskCommandSession');APP.currentUser=null;APP.sessionToken='';document.getElementById('appDashboard').style.display='none';document.getElementById('loginScreen').style.display='flex';document.getElementById('loginEmployeeId').value='';document.getElementById('loginPassword').value='';document.getElementById('loginDepartmentSelect').value=''}
 function showLoginError(msg){const e=document.getElementById('loginError');e.textContent=msg;e.style.display='block'}
 async function loadData(silent=false){if(!APP.currentUser||isLoading)return;isLoading=true;try{const data=await direct('getData',{employeeId:APP.currentUser.employeeId});APP={...APP,...data};APP.currentUser=data.currentUser||APP.currentUser;applyRoleUI();renderAll();updateProfileUI();if(!silent)toast('Data refreshed')}catch(e){if(!silent)toast(e.message||e)}finally{isLoading=false}}
