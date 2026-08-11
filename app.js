@@ -48,9 +48,8 @@ async function supabaseCall(action, payload = {}) {
     case 'login':
       rpcName = 'login_employee';
       params = {
-        p_login_id: payload.employeeId || '',
-        p_password: payload.password || '',
-        p_department: payload.department || ''
+        p_login_id: String(payload.employeeId || '').trim(),
+        p_password: String(payload.password || '')
       };
       break;
 
@@ -173,6 +172,19 @@ async function supabaseCall(action, payload = {}) {
       };
       break;
 
+    case 'addEmployee':
+      rpcName = 'add_employee';
+      params = {
+        p_employee_id: payload.employeeId || APP.currentUser?.employeeId || '',
+        p_session_token: payload.sessionToken || getSessionToken(),
+        p_name: payload.name || '',
+        p_role: payload.role || '',
+        p_email: payload.email || '',
+        p_phone: payload.phone || '',
+        p_department: payload.department || ''
+      };
+      break;
+
     case 'updateOwnProfile':
       rpcName = 'update_own_profile';
       params = {
@@ -283,6 +295,19 @@ function ensureFeatureUI(){
       .tc-detail b{word-break:break-word}
       .team-person{cursor:pointer}
       @media(max-width:600px){.tc-detail-grid{grid-template-columns:1fr}}
+      #memberSuccessPopup{display:none;position:fixed;inset:0;background:rgba(2,8,28,.72);backdrop-filter:blur(8px);z-index:100001;align-items:center;justify-content:center;padding:20px}
+      #memberSuccessPopup.show{display:flex}
+      .member-success-card{width:min(520px,95vw);max-height:90vh;overflow:auto;background:#fff;border:2px solid #1677ff;border-radius:24px;padding:28px;box-shadow:0 30px 90px rgba(0,0,0,.35);position:relative;animation:tcSuccessIn .25s ease}
+      @keyframes tcSuccessIn{from{opacity:0;transform:translateY(20px) scale(.97)}to{opacity:1;transform:none}}
+      .member-success-icon{width:70px;height:70px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:30px;margin:0 auto 14px;background:linear-gradient(135deg,#1677ff,#4318ff)}
+      .member-success-card h2{text-align:center;margin:0 0 16px;color:#111827}
+      .member-success-close{position:absolute;right:12px;top:12px;border:0;width:36px;height:36px;border-radius:50%;background:#f1f5f9;cursor:pointer}
+      .member-success-details{background:#f5f8ff;border:1px solid #dbe7ff;border-radius:15px;padding:12px}
+      .success-row{display:flex;justify-content:space-between;gap:12px;padding:9px 4px;border-bottom:1px solid #e5e7eb;font-size:13px}
+      .success-row:last-child{border-bottom:0}.success-row span{color:#64748b}.success-row strong{text-align:right;word-break:break-word;color:#172554}
+      .success-email-status{margin-top:12px;padding:10px;border-radius:10px;font-size:12px}.email-ok{background:#ecfdf5;color:#047857}.email-warning{background:#fff7ed;color:#c2410c}
+      .member-success-ok{width:100%;margin-top:16px;padding:12px;border:0;border-radius:12px;background:linear-gradient(90deg,#1677ff,#4318ff);color:#fff;font-weight:700;cursor:pointer}
+      .team-person-owner{cursor:pointer}.team-person-owner:hover{transform:translateY(-2px);box-shadow:0 10px 24px rgba(22,119,255,.12)}
     `;
     document.head.appendChild(s);
   }
@@ -328,7 +353,60 @@ function ensureFeatureUI(){
   document.querySelectorAll('[id*="count"],.kpi-card,.stat-card,.dashboard-kpi').forEach(el=>{
     if(el.closest('.kpi-card,.stat-card,.dashboard-kpi')) el.closest('.kpi-card,.stat-card,.dashboard-kpi').classList.add('tc-kpi-card');
   });
+
+  if(!document.getElementById('memberSuccessPopup')){
+    const p=document.createElement('div');
+    p.id='memberSuccessPopup';
+    p.onclick=e=>{if(e.target===p)closeMemberSuccessPopup()};
+    p.innerHTML=`<div class="member-success-card">
+      <button class="member-success-close" onclick="closeMemberSuccessPopup()">✕</button>
+      <div id="memberSuccessIcon" class="member-success-icon"><i class="fas fa-check"></i></div>
+      <h2 id="memberSuccessTitle">Success</h2>
+      <div id="memberSuccessContent"></div>
+      <button class="member-success-ok" onclick="closeMemberSuccessPopup()">Done</button>
+    </div>`;
+    document.body.appendChild(p);
+  }
 }
+function showMemberSuccessPopup(title,content,success=true){
+  const p=document.getElementById('memberSuccessPopup');
+  if(!p)return;
+  document.getElementById('memberSuccessTitle').textContent=title;
+  document.getElementById('memberSuccessContent').innerHTML=content;
+  const icon=document.getElementById('memberSuccessIcon');
+  icon.innerHTML=success?'<i class="fas fa-check"></i>':'<i class="fas fa-xmark"></i>';
+  icon.style.background=success?'linear-gradient(135deg,#1677ff,#4318ff)':'linear-gradient(135deg,#ef4444,#b91c1c)';
+  p.classList.add('show');
+}
+function closeMemberSuccessPopup(){document.getElementById('memberSuccessPopup')?.classList.remove('show')}
+
+async function loadReportLibraries(){
+  if(!window.XLSX){
+    await new Promise((resolve,reject)=>{
+      const sc=document.createElement('script');
+      sc.src='https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
+      sc.onload=resolve;sc.onerror=()=>reject(new Error('Excel library could not be loaded.'));
+      document.head.appendChild(sc);
+    });
+  }
+  if(!window.jspdf?.jsPDF){
+    await new Promise((resolve,reject)=>{
+      const sc=document.createElement('script');
+      sc.src='https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js';
+      sc.onload=resolve;sc.onerror=()=>reject(new Error('PDF library could not be loaded.'));
+      document.head.appendChild(sc);
+    });
+  }
+  if(window.jspdf?.jsPDF && !window.jspdf.jsPDF.API.autoTable){
+    await new Promise((resolve,reject)=>{
+      const sc=document.createElement('script');
+      sc.src='https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js';
+      sc.onload=resolve;sc.onerror=()=>resolve();
+      document.head.appendChild(sc);
+    });
+  }
+}
+
 async function init(){
   ensureFeatureUI();
   const saved=localStorage.getItem('taskCommandUserId');
@@ -355,8 +433,8 @@ async function login(){
   const employeeId=document.getElementById('loginEmployeeId').value.trim(),
         password=document.getElementById('loginPassword').value,
         department=document.getElementById('loginDepartmentSelect').value;
-  if(!employeeId||!password||!department){
-    showLoginError('Please enter Employee ID, password and select department.');
+  if(!employeeId||!password){
+    showLoginError('Please enter Employee ID and password.');
     return;
   }
   const btn=document.querySelector('#loginScreen .btn-primary');
@@ -375,6 +453,7 @@ async function login(){
     });
     APP={...APP,...fresh,sessionToken:APP.sessionToken};
     startSession(fresh.currentUser||result.member);
+    requestDesktopNotifications();
     document.getElementById('loginPassword').value='';
   }catch(e){
     showLoginError(e.message||String(e));
@@ -387,7 +466,37 @@ function applyRoleUI(){const owner=isOwner();document.querySelectorAll('.owner-o
 function logout(){stopLiveRefresh();localStorage.removeItem('taskCommandUserId');localStorage.removeItem('taskCommandSession');APP.currentUser=null;APP.sessionToken='';document.getElementById('appDashboard').style.display='none';document.getElementById('loginScreen').style.display='flex';document.getElementById('loginEmployeeId').value='';document.getElementById('loginPassword').value='';document.getElementById('loginDepartmentSelect').value=''}
 function showLoginError(msg){const e=document.getElementById('loginError');e.textContent=msg;e.style.display='block'}
 async function loadData(silent=false){if(!APP.currentUser||isLoading)return;isLoading=true;try{const data=await direct('getData',{employeeId:APP.currentUser.employeeId});APP={...APP,...data};APP.currentUser=data.currentUser||APP.currentUser;applyRoleUI();renderAll();updateProfileUI();if(!silent)toast('Data refreshed')}catch(e){if(!silent)toast(e.message||e)}finally{isLoading=false}}
-async function loadLive(silent=true){if(!APP.currentUser||isLoading)return;isLoading=true;try{const data=await direct('getLiveUpdates',{employeeId:APP.currentUser.employeeId});APP.tasks=data.tasks||[];APP.notifications=data.notifications||{};APP.announcements=data.announcements||APP.announcements;renderTasks();renderNotifications();renderAnnouncements();if(!silent)toast('Updated')}catch(e){}finally{isLoading=false}}
+async function requestDesktopNotifications(){
+  if(!('Notification' in window)) return false;
+  if(Notification.permission==='granted') return true;
+  if(Notification.permission==='denied') return false;
+  try{return (await Notification.requestPermission())==='granted'}catch(e){return false}
+}
+function desktopNotify(title,body,type='Update'){
+  if(!('Notification' in window)||Notification.permission!=='granted') return;
+  try{
+    const n=new Notification(title,{body,tag:'task-command-'+type,icon:'https://denisha-keshvala.github.io/Taskmanagement/favicon.ico'});
+    n.onclick=()=>{window.focus();n.close()};
+  }catch(e){}
+}
+async function loadLive(silent=true){
+  if(!APP.currentUser||isLoading)return;
+  isLoading=true;
+  try{
+    const old=APP.notifications?.[APP.currentUser.name]||[];
+    const oldKeys=new Set(old.map(n=>String(n.createdAt)+'|'+String(n.message)));
+    const data=await direct('getLiveUpdates',{employeeId:APP.currentUser.employeeId});
+    APP.tasks=data.tasks||[];
+    APP.notifications=data.notifications||{};
+    APP.announcements=data.announcements||APP.announcements;
+    const fresh=(APP.notifications?.[APP.currentUser.name]||[]).filter(n=>!oldKeys.has(String(n.createdAt)+'|'+String(n.message)));
+    fresh.slice(0,5).reverse().forEach(n=>{
+      desktopNotify(n.type==='Announcement'?'📢 New Announcement':'🔵 Task Notification',n.message,n.type||'Update');
+    });
+    renderTasks();renderNotifications();renderAnnouncements();
+    if(!silent)toast('Updated');
+  }catch(e){console.warn('live update',e)}finally{isLoading=false}
+}
 function startLiveRefresh(){stopLiveRefresh();liveRefreshTimer=setInterval(()=>{if(document.visibilityState==='visible'){renderGreeting();loadLive(true)}},3000)}
 function stopLiveRefresh(){if(liveRefreshTimer)clearInterval(liveRefreshTimer);liveRefreshTimer=null}
 function renderAll(){populateAssignees();renderDashboardStats();renderGreeting();renderTasks();renderMembers();renderTeamList();renderNotifications();renderAnnouncements();renderReportSummary()}
@@ -466,6 +575,7 @@ async function downloadTaskReport(kind){
   const buttons=document.querySelectorAll('.report-btn');
   buttons.forEach(b=>b.disabled=true);
   try{
+    if(kind==='xlsx'||kind==='pdf') await loadReportLibraries();
     const employee=isOwner()?((document.getElementById('reportEmployee')||{}).value||'ALL'):APP.currentUser.name;
     const period=(document.getElementById('reportPeriod')||{}).value||'all';
     const r=await api('getTaskReport',{employeeId:APP.currentUser.employeeId,employee,period});
@@ -588,10 +698,10 @@ function openProfileModal(){if(APP.currentUser){fillProfile(APP.currentUser);doc
 function closeProfileModal(){document.getElementById('profileModal').classList.remove('show');closeProfileEdit()}
 function toggleProfileEdit(){const p=document.getElementById('profileEditPanel');p.style.display=p.style.display==='none'?'block':'none';const m=APP.currentUser;if(m){document.getElementById('editProfileName').value=m.name;document.getElementById('editProfileRole').value=m.role;document.getElementById('editProfilePhone').value=m.phone;document.getElementById('editProfileEmail').value=m.email}}
 function closeProfileEdit(){document.getElementById('profileEditPanel').style.display='none'}
-async function saveProfileChanges(){const m=APP.currentUser;if(!m)return;try{const res=await api('updateOwnProfile',{employeeId:m.employeeId,role:m.role,phone:document.getElementById('editProfilePhone').value.trim(),email:document.getElementById('editProfileEmail').value.trim(),photo:m.photo||''});APP.currentUser=res.member;APP.members=APP.members.map(x=>x.employeeId===m.employeeId?res.member:x);updateProfileUI();closeProfileEdit();toast('Profile updated')}catch(e){toast(e.message||e)}}
+async function saveProfileChanges(){const m=APP.currentUser;if(!m)return;try{const res=await api('updateOwnProfile',{employeeId:m.employeeId,phone:document.getElementById('editProfilePhone').value.trim(),email:document.getElementById('editProfileEmail').value.trim(),photo:m.photo||''});APP.currentUser=res.member;APP.members=APP.members.map(x=>x.employeeId===m.employeeId?res.member:x);updateProfileUI();closeProfileEdit();toast('Profile updated')}catch(e){toast(e.message||e)}}
 async function uploadProfilePhoto(e){const f=e.target.files[0];if(!f||!APP.currentUser)return;try{const url=await uploadFile(f,'uploadPhoto',APP.currentUser.name);const res=await api('updateOwnProfile',{employeeId:APP.currentUser.employeeId,phone:APP.currentUser.phone,email:APP.currentUser.email,photo:url});APP.currentUser=res.member;APP.members=APP.members.map(x=>x.employeeId===APP.currentUser.employeeId?res.member:x);updateProfileUI();fillProfile(APP.currentUser);toast('Profile photo updated successfully')}catch(err){toast(err.message||err)}e.target.value=''}
 function execCmd(cmd){document.execCommand(cmd,false,null);document.getElementById('fullDescription').focus()}
-document.addEventListener('keydown',e=>{if(e.key==='Enter'&&(document.activeElement===document.getElementById('loginEmployeeId')||document.activeElement===document.getElementById('loginPassword')))login();if(e.key==='Escape'){closeTaskDetails();closeAnnouncementModal()}});
+document.addEventListener('keydown',e=>{if(e.key==='Enter'&&(document.activeElement===document.getElementById('loginEmployeeId')||document.activeElement===document.getElementById('loginPassword')))login();if(e.key==='Escape'){closeTaskDetails();closeAnnouncementModal();closeAnnouncementDetails();closeEmployeePanel();closeMemberSuccessPopup()}});
 window.addEventListener('load',init);
 
 document.addEventListener('click',function(e){const wrap=document.getElementById('multiAssignee');if(wrap&&!wrap.contains(e.target))closeAssigneePicker();});
