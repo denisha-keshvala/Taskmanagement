@@ -48,8 +48,9 @@ async function supabaseCall(action, payload = {}) {
     case 'login':
       rpcName = 'login_employee';
       params = {
-        p_login_id: String(payload.employeeId || '').trim(),
-        p_password: String(payload.password || '')
+        p_login_id: payload.employeeId || '',
+        p_password: payload.password || '',
+        p_department: payload.department || ''
       };
       break;
 
@@ -175,13 +176,13 @@ async function supabaseCall(action, payload = {}) {
     case 'addEmployee':
       rpcName = 'add_employee';
       params = {
-        p_employee_id: payload.employeeId || APP.currentUser?.employeeId || '',
+        p_employee_id: payload.employeeId || '',
         p_session_token: payload.sessionToken || getSessionToken(),
         p_name: payload.name || '',
-        p_role: payload.role || '',
+        p_role: payload.role || 'employee',
         p_email: payload.email || '',
         p_phone: payload.phone || '',
-        p_department: payload.department || ''
+        p_department: payload.department || 'Other'
       };
       break;
 
@@ -260,12 +261,6 @@ async function uploadFile(file, action, nameOverride) {
   return publicData.publicUrl;
 }
 
-async function updateEmployeeRow(loginId,patch){
-  const q=await supabaseClient.from('employees').update(patch).eq('login_id',loginId).select('*').maybeSingle();
-  if(q.error)throw sbError(q.error);
-  return q.data;
-}
-
 async function persist() {
   return api('saveAll', {
     employeeId: APP.currentUser?.employeeId,
@@ -287,7 +282,7 @@ function ensureFeatureUI(){
     const s=document.createElement('style');
     s.id='tcFeatureStyles';
     s.textContent=`
-      .tc-kpi-card{border:2px solid #0b2a66!important;box-shadow:0 8px 24px rgba(22,119,255,.08)!important}
+      .tc-kpi-card{border:2px solid rgba(22,119,255,.38)!important;box-shadow:0 8px 24px rgba(22,119,255,.08)!important}
       .announcement-card{cursor:pointer;transition:.2s}
       .announcement-card:hover{transform:translateY(-2px);box-shadow:0 12px 28px rgba(22,119,255,.14)}
       .tc-modal{display:none;position:fixed;inset:0;background:rgba(2,8,28,.72);backdrop-filter:blur(8px);z-index:100000;align-items:center;justify-content:center;padding:20px}
@@ -301,25 +296,9 @@ function ensureFeatureUI(){
       .tc-detail b{word-break:break-word}
       .team-person{cursor:pointer}
       @media(max-width:600px){.tc-detail-grid{grid-template-columns:1fr}}
-      #memberSuccessPopup{display:none;position:fixed;inset:0;background:rgba(2,8,28,.72);backdrop-filter:blur(8px);z-index:100001;align-items:center;justify-content:center;padding:20px}
-      #memberSuccessPopup.show{display:flex}
-      .member-success-card{width:min(520px,95vw);max-height:90vh;overflow:auto;background:#fff;border:2px solid #1677ff;border-radius:24px;padding:28px;box-shadow:0 30px 90px rgba(0,0,0,.35);position:relative;animation:tcSuccessIn .25s ease}
-      @keyframes tcSuccessIn{from{opacity:0;transform:translateY(20px) scale(.97)}to{opacity:1;transform:none}}
-      .member-success-icon{width:70px;height:70px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:30px;margin:0 auto 14px;background:linear-gradient(135deg,#1677ff,#4318ff)}
-      .member-success-card h2{text-align:center;margin:0 0 16px;color:#111827}
-      .member-success-close{position:absolute;right:12px;top:12px;border:0;width:36px;height:36px;border-radius:50%;background:#f1f5f9;cursor:pointer}
-      .member-success-details{background:#f5f8ff;border:1px solid #dbe7ff;border-radius:15px;padding:12px}
-      .success-row{display:flex;justify-content:space-between;gap:12px;padding:9px 4px;border-bottom:1px solid #e5e7eb;font-size:13px}
-      .success-row:last-child{border-bottom:0}.success-row span{color:#64748b}.success-row strong{text-align:right;word-break:break-word;color:#172554}
-      .success-email-status{margin-top:12px;padding:10px;border-radius:10px;font-size:12px}.email-ok{background:#ecfdf5;color:#047857}.email-warning{background:#fff7ed;color:#c2410c}
-      .member-success-ok{width:100%;margin-top:16px;padding:12px;border:0;border-radius:12px;background:linear-gradient(90deg,#1677ff,#4318ff);color:#fff;font-weight:700;cursor:pointer}
-      .team-person-owner{cursor:pointer}.team-person-owner:hover{transform:translateY(-2px);box-shadow:0 10px 24px rgba(22,119,255,.12)}
     `;
     document.head.appendChild(s);
   }
-
-
-  document.querySelectorAll('[id^=count], [id*=count]').forEach(el=>{const card=el.closest('.kpi-card,.stat-card,.dashboard-kpi,.card');if(card)card.classList.add('tc-kpi-card');});
 
   if(!document.getElementById('announcementDetailsModal')){
     const m=document.createElement('div');
@@ -362,60 +341,7 @@ function ensureFeatureUI(){
   document.querySelectorAll('[id*="count"],.kpi-card,.stat-card,.dashboard-kpi').forEach(el=>{
     if(el.closest('.kpi-card,.stat-card,.dashboard-kpi')) el.closest('.kpi-card,.stat-card,.dashboard-kpi').classList.add('tc-kpi-card');
   });
-
-  if(!document.getElementById('memberSuccessPopup')){
-    const p=document.createElement('div');
-    p.id='memberSuccessPopup';
-    p.onclick=e=>{if(e.target===p)closeMemberSuccessPopup()};
-    p.innerHTML=`<div class="member-success-card">
-      <button class="member-success-close" onclick="closeMemberSuccessPopup()">✕</button>
-      <div id="memberSuccessIcon" class="member-success-icon"><i class="fas fa-check"></i></div>
-      <h2 id="memberSuccessTitle">Success</h2>
-      <div id="memberSuccessContent"></div>
-      <button class="member-success-ok" onclick="closeMemberSuccessPopup()">Done</button>
-    </div>`;
-    document.body.appendChild(p);
-  }
 }
-function showMemberSuccessPopup(title,content,success=true){
-  const p=document.getElementById('memberSuccessPopup');
-  if(!p)return;
-  document.getElementById('memberSuccessTitle').textContent=title;
-  document.getElementById('memberSuccessContent').innerHTML=content;
-  const icon=document.getElementById('memberSuccessIcon');
-  icon.innerHTML=success?'<i class="fas fa-check"></i>':'<i class="fas fa-xmark"></i>';
-  icon.style.background=success?'linear-gradient(135deg,#1677ff,#4318ff)':'linear-gradient(135deg,#ef4444,#b91c1c)';
-  p.classList.add('show');
-}
-function closeMemberSuccessPopup(){document.getElementById('memberSuccessPopup')?.classList.remove('show')}
-
-async function loadReportLibraries(){
-  if(!window.XLSX){
-    await new Promise((resolve,reject)=>{
-      const sc=document.createElement('script');
-      sc.src='https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
-      sc.onload=resolve;sc.onerror=()=>reject(new Error('Excel library could not be loaded.'));
-      document.head.appendChild(sc);
-    });
-  }
-  if(!window.jspdf?.jsPDF){
-    await new Promise((resolve,reject)=>{
-      const sc=document.createElement('script');
-      sc.src='https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js';
-      sc.onload=resolve;sc.onerror=()=>reject(new Error('PDF library could not be loaded.'));
-      document.head.appendChild(sc);
-    });
-  }
-  if(window.jspdf?.jsPDF && !window.jspdf.jsPDF.API.autoTable){
-    await new Promise((resolve,reject)=>{
-      const sc=document.createElement('script');
-      sc.src='https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js';
-      sc.onload=resolve;sc.onerror=()=>resolve();
-      document.head.appendChild(sc);
-    });
-  }
-}
-
 async function init(){
   ensureFeatureUI();
   const saved=localStorage.getItem('taskCommandUserId');
@@ -442,8 +368,8 @@ async function login(){
   const employeeId=document.getElementById('loginEmployeeId').value.trim(),
         password=document.getElementById('loginPassword').value,
         department=document.getElementById('loginDepartmentSelect').value;
-  if(!employeeId||!password){
-    showLoginError('Please enter Employee ID and password.');
+  if(!employeeId||!password||!department){
+    showLoginError('Please enter Employee ID, password and select department.');
     return;
   }
   const btn=document.querySelector('#loginScreen .btn-primary');
@@ -462,7 +388,6 @@ async function login(){
     });
     APP={...APP,...fresh,sessionToken:APP.sessionToken};
     startSession(fresh.currentUser||result.member);
-    requestDesktopNotifications();
     document.getElementById('loginPassword').value='';
   }catch(e){
     showLoginError(e.message||String(e));
@@ -475,38 +400,8 @@ function applyRoleUI(){const owner=isOwner();document.querySelectorAll('.owner-o
 function logout(){stopLiveRefresh();localStorage.removeItem('taskCommandUserId');localStorage.removeItem('taskCommandSession');APP.currentUser=null;APP.sessionToken='';document.getElementById('appDashboard').style.display='none';document.getElementById('loginScreen').style.display='flex';document.getElementById('loginEmployeeId').value='';document.getElementById('loginPassword').value='';document.getElementById('loginDepartmentSelect').value=''}
 function showLoginError(msg){const e=document.getElementById('loginError');e.textContent=msg;e.style.display='block'}
 async function loadData(silent=false){if(!APP.currentUser||isLoading)return;isLoading=true;try{const data=await direct('getData',{employeeId:APP.currentUser.employeeId});APP={...APP,...data};APP.currentUser=data.currentUser||APP.currentUser;applyRoleUI();renderAll();updateProfileUI();if(!silent)toast('Data refreshed')}catch(e){if(!silent)toast(e.message||e)}finally{isLoading=false}}
-async function requestDesktopNotifications(){
-  if(!('Notification' in window)) return false;
-  if(Notification.permission==='granted') return true;
-  if(Notification.permission==='denied') return false;
-  try{return (await Notification.requestPermission())==='granted'}catch(e){return false}
-}
-function desktopNotify(title,body,type='Update'){
-  if(!('Notification' in window)||Notification.permission!=='granted') return;
-  try{
-    const n=new Notification(title,{body,tag:'task-command-'+type,icon:'https://denisha-keshvala.github.io/Taskmanagement/favicon.ico'});
-    n.onclick=()=>{window.focus();n.close()};
-  }catch(e){}
-}
-async function loadLive(silent=true){
-  if(!APP.currentUser||isLoading)return;
-  isLoading=true;
-  try{
-    const old=APP.notifications?.[APP.currentUser.name]||[];
-    const oldKeys=new Set(old.map(n=>String(n.createdAt)+'|'+String(n.message)));
-    const data=await direct('getLiveUpdates',{employeeId:APP.currentUser.employeeId});
-    APP.tasks=data.tasks||[];
-    APP.notifications=data.notifications||{};
-    APP.announcements=data.announcements||APP.announcements;
-    const fresh=(APP.notifications?.[APP.currentUser.name]||[]).filter(n=>!oldKeys.has(String(n.createdAt)+'|'+String(n.message)));
-    fresh.slice(0,5).reverse().forEach(n=>{
-      desktopNotify(n.type==='Announcement'?'📢 New Announcement':'🔵 Task Notification',n.message,n.type||'Update');
-    });
-    renderTasks();renderNotifications();renderAnnouncements();
-    if(!silent)toast('Updated');
-  }catch(e){console.warn('live update',e)}finally{isLoading=false}
-}
-function startLiveRefresh(){stopLiveRefresh();liveRefreshTimer=setInterval(()=>{renderGreeting();loadLive(true)},3000)}
+async function loadLive(silent=true){if(!APP.currentUser||isLoading)return;isLoading=true;try{const data=await direct('getLiveUpdates',{employeeId:APP.currentUser.employeeId});APP.tasks=data.tasks||[];APP.notifications=data.notifications||{};APP.announcements=data.announcements||APP.announcements;renderTasks();renderNotifications();renderAnnouncements();if(!silent)toast('Updated')}catch(e){}finally{isLoading=false}}
+function startLiveRefresh(){stopLiveRefresh();liveRefreshTimer=setInterval(()=>{if(document.visibilityState==='visible'){renderGreeting();loadLive(true)}},3000)}
 function stopLiveRefresh(){if(liveRefreshTimer)clearInterval(liveRefreshTimer);liveRefreshTimer=null}
 function renderAll(){populateAssignees();renderDashboardStats();renderGreeting();renderTasks();renderMembers();renderTeamList();renderNotifications();renderAnnouncements();renderReportSummary()}
 function populateAssignees(){const selects=[document.getElementById('fullAssignee'),document.getElementById('quickAssignee'),document.getElementById('fullFollowUp')];selects.forEach(sel=>{if(!sel)return;const old=sel.multiple?getSelectedAssignees():sel.value;const prefix=sel.id==='fullFollowUp'?'<option value="">-- No Follow-up --</option>':'<option value="">-- Select Member --</option>';sel.innerHTML=prefix+APP.members.map(m=>`<option value="${escapeHtml(m.name)}">${escapeHtml(m.name)}</option>`).join('');if(Array.isArray(old))old.forEach(v=>{const o=Array.from(sel.options).find(x=>String(x.value).toLowerCase()===String(v).toLowerCase());if(o)o.selected=true});else if(old)sel.value=old});renderAssigneePicker();const report=document.getElementById('reportEmployee');if(report){const old=report.value;report.innerHTML='<option value="ALL">All Employees</option>'+APP.members.map(m=>`<option value="${escapeHtml(m.name)}">${escapeHtml(m.name)}</option>`).join('');if(isOwner()){report.disabled=false;if(old)report.value=old}else{report.innerHTML=`<option value="${escapeHtml(APP.currentUser?.name||'')}">${escapeHtml(APP.currentUser?.name||'My Tasks')}</option>`;report.value=APP.currentUser?.name||'';report.disabled=true}}}
@@ -529,27 +424,7 @@ function renderTasks(){
   mobile.innerHTML=tasks.map(t=>{const overdue=t.deadline&&new Date(t.deadline+'T23:59:59')<new Date()&&String(t.status).toLowerCase()!=='completed';const status=t.status||'Pending';return `<div class="mobile-task-card" onclick="openTaskDetails('${escapeHtml(t.id)}')"><div class="mobile-task-top"><div><div class="mobile-task-title">${escapeHtml(t.taskType)}</div><div class="mobile-task-id">${escapeHtml(t.id)} • ${escapeHtml(taskAssignedToText(t))} • ${escapeHtml(t.taskDepartment||t.department||'Other')}</div></div><span class="badge badge-${String(t.priority||'Medium').toLowerCase()}">${escapeHtml(t.priority)}</span></div><div class="mobile-task-meta"><div><span>Deadline</span><b>${escapeHtml(t.deadline||'—')}</b>${overdue?' <span class="status-overdue">OVERDUE</span>':''}</div><div><span>Assigned By</span><b>${escapeHtml(t.createdByName||'—')}</b></div></div><div class="mobile-task-bottom" onclick="event.stopPropagation()"><select onchange="changeTaskStatus('${escapeHtml(t.id)}',this.value)"><option ${status==='Pending'?'selected':''}>Pending</option><option ${status==='In Progress'?'selected':''}>In Progress</option><option ${status==='Completed'?'selected':''}>Completed</option></select><button onclick="openTaskDetails('${escapeHtml(t.id)}')"><i class="fas fa-eye"></i></button></div></div>`}).join('');
   renderDashboardStats();
 }
-async function changeTaskStatus(id,status){
-  const t=APP.tasks.find(x=>String(x.id)===String(id));
-  if(!t)return;
-  const old={status:t.status,completedAt:t.completedAt};
-  t.status=status;
-  t.completedAt=status==='Completed'?new Date().toISOString():'';
-  renderAll();
-  try{
-    const res=await api('updateTaskStatus',{employeeId:APP.currentUser.employeeId,taskId:id,status});
-    if(res&&res.ok===false)throw new Error(res.message||'Status update failed.');
-    await loadData(true);
-    toast('Task status updated to '+status);
-  }catch(e){
-    try{
-      const q=await supabaseClient.from('tasks').update({status:status,completed_at:status==='Completed'?new Date().toISOString():null}).eq('id',id).select('*').maybeSingle();
-      if(q.error)throw sbError(q.error);
-      if(q.data){t.status=q.data.status||status;t.completedAt=q.data.completed_at||'';renderAll();toast('Task status updated to '+status);return;}
-    }catch(fallback){console.error('status fallback',fallback);}
-    t.status=old.status;t.completedAt=old.completedAt;renderAll();toast(e.message||String(e));
-  }
-}
+async function changeTaskStatus(id,status){const t=APP.tasks.find(x=>x.id===id);if(!t)return;const old={status:t.status,completedAt:t.completedAt};t.status=status;t.completedAt=status==='Completed'?new Date().toISOString():'';renderTasks();try{await api('updateTaskStatus',{employeeId:APP.currentUser.employeeId,taskId:id,status});toast('Task status updated');await loadLive(true)}catch(e){t.status=old.status;t.completedAt=old.completedAt;renderTasks();toast(e.message||String(e))}}
 function openTaskDetails(id){const t=APP.tasks.find(x=>x.id===id);if(!t)return;document.getElementById('detailTaskId').textContent=t.id||'TASK';document.getElementById('detailTaskTitle').textContent=t.taskType||'Task Details';document.getElementById('detailAssignedTo').textContent=taskAssignedToText(t)||'—';document.getElementById('detailAssignedBy').textContent=t.createdByName||t.createdBy||'—';document.getElementById('detailFollowUp').textContent=t.followUpTo||'—';document.getElementById('detailDepartment').textContent=t.taskDepartment||t.department||'—';document.getElementById('detailPriority').textContent=t.priority||'—';document.getElementById('detailDeadline').textContent=t.deadline||'—';document.getElementById('detailStatus').textContent=t.status||'—';document.getElementById('detailCreated').textContent=t.createdAt?new Date(t.createdAt).toLocaleString():'—';document.getElementById('detailReminder').textContent=t.reminder||'—';document.getElementById('detailCompleted').textContent=t.completedAt?new Date(t.completedAt).toLocaleString():'—';document.getElementById('detailDescription').innerHTML=safeRich(t.description)||'<span style="color:var(--text-muted)">No description provided.</span>';const a=document.getElementById('detailFile');a.style.display=t.fileUrl?'inline-block':'none';if(t.fileUrl)a.href=t.fileUrl;document.getElementById('taskDetailsModal').classList.add('show')}
 function closeTaskDetails(){document.getElementById('taskDetailsModal').classList.remove('show')}
 function editTask(id){if(!isOwner())return;const t=APP.tasks.find(x=>x.id===id);if(!t)return;document.getElementById('editTaskId').value=t.id;document.getElementById('fullTaskDepartment').value=t.taskDepartment||t.department||'';document.getElementById('fullTaskType').value=t.taskType;setSelectedAssignees(t.assignedTo);document.getElementById('fullPriority').value=t.priority;document.getElementById('fullDeadline').value=t.deadline||'';document.getElementById('fullReminder').value=t.reminder||'';document.getElementById('fullFollowUp').value=t.followUpTo||'';document.getElementById('fullDescription').innerHTML=t.description||'';document.getElementById('taskFormTitle').innerHTML='<i class="fas fa-pen"></i> Edit Task';document.getElementById('saveTaskBtn').innerHTML='<i class="fas fa-save"></i> Update Task';showPage('assign-task-page');document.getElementById('currentPageTitle').textContent='Edit Task'}
@@ -568,39 +443,7 @@ function taskAssignees(t){
 }
 function taskAssignedToText(t){ return taskAssignees(t).join(', '); }
 function taskAssignedToMe(t,name){ return taskAssignees(t).some(x=>String(x).trim().toLowerCase()===String(name||'').trim().toLowerCase()); }
-async function submitFullTask(e){
-  e.preventDefault();
-  if(!APP.currentUser){toast('Please login first.');return;}
-  const id=document.getElementById('editTaskId')?.value||'';
-  const dept=(document.getElementById('fullTaskDepartment')?.value||document.getElementById('fullDepartment')?.value||APP.currentUser.department||'Other').trim();
-  const taskType=(document.getElementById('fullTaskType')?.value||'').trim();
-  const assignedTo=getSelectedAssignees().join(', ');
-  const deadline=document.getElementById('fullDeadline')?.value||'';
-  const payload={employeeId:APP.currentUser.employeeId,sessionToken:getSessionToken(),taskDepartment:dept,taskType,assignedTo,followUpTo:document.getElementById('fullFollowUp')?.value||'',priority:document.getElementById('fullPriority')?.value||'Medium',deadline,reminder:document.getElementById('fullReminder')?.value||'',description:document.getElementById('fullDescription')?.innerHTML||'',fileUrl:''};
-  if(!taskType){toast('Please select Task Type.');return;}
-  if(!assignedTo){toast('Please select at least one team member.');return;}
-  if(!deadline){toast('Please select deadline.');return;}
-  try{
-    const f=document.getElementById('fullTaskFile')?.files?.[0];
-    if(f)payload.fileUrl=await uploadFile(f,'uploadTaskFile');
-    if(id&&isOwner()){
-      const q=await supabaseClient.from('tasks').update({task_type:payload.taskType,assigned_to:payload.assignedTo,priority:payload.priority,deadline:payload.deadline,reminder:payload.reminder,description:payload.description,file_url:payload.fileUrl,department:payload.taskDepartment,follow_up:payload.followUpTo}).eq('id',id).select('*').maybeSingle();
-      if(q.error)throw sbError(q.error);
-      toast('Task updated successfully');
-    }else{
-      try{await api('createTask',payload);}
-      catch(rpcErr){
-        const q=await supabaseClient.from('tasks').insert({task_type:payload.taskType,assigned_to:payload.assignedTo,priority:payload.priority,deadline:payload.deadline,reminder:payload.reminder,description:payload.description,file_url:payload.fileUrl,department:payload.taskDepartment,follow_up:payload.followUpTo,status:'Pending',created_by:APP.currentUser.id||null,created_at:new Date().toISOString()}).select('*').single();
-        if(q.error)throw rpcErr;
-      }
-      toast('Task added successfully');
-    }
-    resetTaskForm();
-    await loadData(true);
-    showPage('dashboard-page');
-    document.getElementById('currentPageTitle').textContent=isOwner()?'Dashboard':'My Tasks';
-  }catch(err){console.error('submitFullTask',err);toast(err.message||String(err));}
-}
+async function submitFullTask(e){e.preventDefault();const id=document.getElementById('editTaskId').value;const payload={employeeId:APP.currentUser.employeeId,taskDepartment:document.getElementById('fullTaskDepartment').value,taskType:document.getElementById('fullTaskType').value,assignedTo:getSelectedAssignees().join(', '),followUpTo:document.getElementById('fullFollowUp').value,priority:document.getElementById('fullPriority').value,deadline:document.getElementById('fullDeadline').value,reminder:document.getElementById('fullReminder').value,description:document.getElementById('fullDescription').innerHTML};if(!payload.taskDepartment){toast('Please select a department.');return}if(!payload.assignedTo){toast('Please select at least one team member.');return}const f=document.getElementById('fullTaskFile').files[0];try{if(f)payload.fileUrl=await uploadFile(f,'uploadTaskFile');if(id&&isOwner()){const t=APP.tasks.find(x=>x.id===id);Object.assign(t,payload,{id:id,createdBy:t.createdBy,createdByName:t.createdByName,department:payload.taskDepartment,taskDepartment:payload.taskDepartment,updatedAt:new Date().toISOString()});await persist();toast('Task updated')}else{await api('createTask',payload);toast(taskAssignees({assignedTo:payload.assignedTo}).includes(APP.currentUser.name)?'Task created':'Task assigned successfully')}resetTaskForm();await loadData(true);showPage('dashboard-page');document.getElementById('currentPageTitle').textContent=isOwner()?'Dashboard':'My Tasks'}catch(err){toast(err.message||String(err))}}
 async function createQuickTask(){const title=document.getElementById('quickTitle').value.trim(),assignee=document.getElementById('quickAssignee').value,due=document.getElementById('quickDueDate').value,department=document.getElementById('quickDepartment').value;if(!title||!assignee||!due||!department){toast('Enter title, department, member and due date');return}try{await api('createTask',{employeeId:APP.currentUser.employeeId,taskType:title,taskDepartment:department,assignedTo:assignee,priority:document.getElementById('quickPriority').value,deadline:due,reminder:'',description:'',fileUrl:''});document.getElementById('quickTitle').value='';document.getElementById('quickDepartment').value='';await loadData(true);toast('Task added')}catch(e){toast(e.message||String(e))}}
 function resetTaskForm(){document.getElementById('editTaskId').value='';document.getElementById('fullTaskDepartment').value='';document.getElementById('fullTaskType').value='';Array.from(document.getElementById('fullAssignee').options).forEach(o=>o.selected=false);renderAssigneePicker();closeAssigneePicker();document.getElementById('fullFollowUp').value='';document.getElementById('fullPriority').value='Medium';document.getElementById('fullDeadline').value='';document.getElementById('fullReminder').value='';document.getElementById('fullDescription').innerHTML='';document.getElementById('fullTaskFile').value='';document.getElementById('taskFormTitle').innerHTML='<i class="fas fa-tasks"></i> Assign New Task';document.getElementById('saveTaskBtn').innerHTML='<i class="fas fa-paper-plane"></i> Assign Task'}
 function renderDashboardStats(){const all=APP.tasks||[];const open=all.filter(t=>String(t.status||'Pending').toLowerCase()!=='completed').length;const pending=all.filter(t=>String(t.status||'Pending').toLowerCase()==='pending').length;const progress=all.filter(t=>String(t.status||'').toLowerCase()==='in progress').length;const completed=all.filter(t=>String(t.status||'').toLowerCase()==='completed').length;[['countOpen',open],['countPending',pending],['countProgress',progress],['countCompleted',completed]].forEach(([id,n])=>{const el=document.getElementById(id);if(el)el.textContent=n})}
@@ -608,96 +451,204 @@ function renderGreeting(){const m=APP.currentUser;if(!m)return;const h=new Date(
 function openCountDetails(type){let filter='my';let title='My Tasks';if(type==='completed'){filter='completed';title='Completed'}else if(type==='in-progress'){filter='in-progress';title='In Progress'}else if(type==='pending'){filter='pending';title='Pending'}else if(type==='open'){filter='open';title='Open Tasks'}APP.filter=filter;document.getElementById('currentPageTitle').textContent=title;document.getElementById('taskTableHeading').textContent=title;showPage('dashboard-page');renderTasks()}
 
 function renderMembers(){const body=document.getElementById('memberTableBody');if(!body)return;body.innerHTML=APP.members.map((m,i)=>{const count=APP.tasks.filter(t=>taskAssignedToMe(t,m.name)&&String(t.status).toLowerCase()==='completed').length;return `<tr><td>${escapeHtml(m.name)}</td><td>${escapeHtml(m.role)}</td><td>${escapeHtml(m.email)}</td><td>${escapeHtml(m.phone)}</td><td>${escapeHtml(m.department||'—')}</td><td><b>${count}</b></td><td>${isOwner()?`<button class="btn-sm btn-edit" onclick="editMember(${i})">Edit</button><button class="btn-sm btn-delete" onclick="deleteMember(${i})">Delete</button>`:'View only'}</td></tr>`}).join('')||'<tr><td colspan="7" style="text-align:center;color:var(--text-muted)">No members yet.</td></tr>'}
-function renderTeamList(){const el=document.getElementById('teamList');if(!el)return;el.innerHTML=APP.members.map(m=>`<div class="team-person ${isOwner()?'team-person-owner':''}" ${isOwner()?`onclick="openEmployeePanel('${escapeHtml(m.employeeId||m.login_id||m.id)}')"`:''}><div class="team-avatar">${m.photo?`<img src="${escapeHtml(m.photo)}">`:initials(m.name)}</div><div><h4>${escapeHtml(m.name)}</h4><p>${escapeHtml(m.role||'Team Member')}</p><span class="dept">${escapeHtml(m.department||'Other')}</span></div></div>`).join('')||'<p style="color:var(--text-muted)">No team members.</p>'}
+function renderTeamList(){const el=document.getElementById('teamList');if(!el)return;el.innerHTML=APP.members.map(m=>`<div class="team-person"><div class="team-avatar">${m.photo?`<img src="${escapeHtml(m.photo)}">`:initials(m.name)}</div><div><h4>${escapeHtml(m.name)}</h4><p>${escapeHtml(m.role||'Team Member')}</p><span class="dept">${escapeHtml(m.department||'Other')}</span></div></div>`).join('')||'<p style="color:var(--text-muted)">No team members.</p>'}
 async function saveMember(e){
   e.preventDefault();
-  if(!isOwner()){toast('Only the Owner can manage members.');return;}
-  const idx=Number(document.getElementById('editMemberIndex')?.value||-1);
-  const name=(document.getElementById('memberName')?.value||'').trim();
-  const role=(document.getElementById('memberRole')?.value||'').trim();
-  const email=(document.getElementById('memberEmail')?.value||'').trim();
-  const phone=(document.getElementById('memberPhone')?.value||'').trim();
-  const dept=(document.getElementById('memberDepartment')?.value||'').trim() || APP.currentUser?.department || 'Operations';
-  if(!name||!role||!email||!phone){toast('Please fill Name, Role, Email and Phone.');return;}
+  if(!isOwner()){toast('Only the Owner can manage members.');return}
+  const i=Number(document.getElementById('editMemberIndex').value);
+  const name=document.getElementById('memberName').value.trim();
+  const role=document.getElementById('memberRole').value.trim() || 'employee';
+  const email=document.getElementById('memberEmail').value.trim();
+  const phone=document.getElementById('memberPhone').value.trim();
+  const department=document.getElementById('memberDepartment').value || 'Other';
+  if(!name||!role||!email||!phone){toast('Please fill all member details.');return}
+  const btn=document.getElementById('saveMemberBtn');
+  if(btn)btn.disabled=true;
   try{
-    if(idx>=0){
-      const old=APP.members[idx];
-      const id=old?.id||old?.uuid;
-      let updated=null;
-      if(id){
-        const q=await supabaseClient.from('employees').update({name,role,email,phone,department:dept}).eq('id',id).select('*').maybeSingle();
-        if(q.error)throw sbError(q.error);
-        updated=q.data;
-      }else{
-        const q=await supabaseClient.from('employees').update({name,role,email,phone,department:dept}).eq('login_id',old.employeeId||old.login_id).select('*').maybeSingle();
-        if(q.error)throw sbError(q.error);
-        updated=q.data;
-      }
+    if(i>=0){
+      const old=APP.members[i];
+      if(!old?.id)throw new Error('Member database ID is missing. Refresh the page and try again.');
+      const {error}=await supabaseClient.from('employees')
+        .update({name,role,email,phone,department,updated_at:new Date().toISOString()})
+        .eq('id',old.id);
+      if(error)throw sbError(error);
       await loadData(true);
-      clearMemberFormSafe();
-      showMemberSuccessPopup('Member Updated Successfully',`<div class="member-success-details"><div class="success-row"><span>Name</span><strong>${escapeHtml(name)}</strong></div><div class="success-row"><span>Employee ID</span><strong>${escapeHtml(old.employeeId||old.login_id||'')}</strong></div><div class="success-row"><span>Department</span><strong>${escapeHtml(dept)}</strong></div><div class="success-row"><span>Role</span><strong>${escapeHtml(role)}</strong></div></div>`,true);
-      return;
+      toast('Member updated successfully');
+    }else{
+      const result=await api('addEmployee',{employeeId:APP.currentUser?.employeeId||'',sessionToken:getSessionToken(),name,role,email,phone,department});
+      if(result && result.ok===false)throw new Error(result.message||'Member could not be added.');
+      const added=result?.member||result?.data?.member||result;
+      await loadData(true);
+      const generatedId=added?.employeeId||added?.login_id||name.toLowerCase().replace(/\s+/g,'');
+      const generatedPassword=added?.password||generatedId+'@123';
+      showMemberSuccessPopup({name,employeeId:generatedId,password:generatedPassword,department,role,email});
     }
-    const res=await api('addEmployee',{employeeId:APP.currentUser.employeeId,name,role,email,phone,department:dept});
-    const raw=res?.member||res?.employee||res?.data||res||{};
-    const loginId=res?.loginId||res?.login_id||raw?.employeeId||raw?.login_id||name.toLowerCase().replace(/[^a-z0-9]+/g,'');
-    const password=res?.password||raw?.password||res?.temporaryPassword||'';
-    let mailSent=false;
-    try{
-      const mail=await supabaseClient.functions.invoke('send-welcome-email',{body:{name,email,loginId,password,role,department:dept,loginUrl:'https://denisha-keshvala.github.io/Taskmanagement/'}});
-      mailSent=!mail?.error;
-    }catch(mailErr){console.warn('welcome email',mailErr);}
-    clearMemberFormSafe();
-    await loadData(true);
-    showMemberSuccessPopup('Member Added Successfully',`<div class="member-success-details"><div class="success-row"><span>Name</span><strong>${escapeHtml(name)}</strong></div><div class="success-row"><span>Employee ID</span><strong>${escapeHtml(loginId)}</strong></div><div class="success-row"><span>Password</span><strong>${escapeHtml(password||'Generated by Supabase')}</strong></div><div class="success-row"><span>Department</span><strong>${escapeHtml(dept)}</strong></div><div class="success-row"><span>Role</span><strong>${escapeHtml(role)}</strong></div><div class="success-row"><span>Email</span><strong>${escapeHtml(email)}</strong></div><div class="success-email-status ${mailSent?'email-ok':'email-warning'}">${mailSent?'✓ Welcome email sent successfully.':'Member added. Welcome email service is not configured/available yet.'}</div></div>`,true);
-  }catch(err){console.error('saveMember',err);toast(err.message||String(err));}
+    e.target.reset();
+    document.getElementById('editMemberIndex').value='-1';
+    document.getElementById('memberFormTitle').innerHTML='<i class="fas fa-user-plus"></i> Add New Team Member';
+    document.getElementById('saveMemberBtn').textContent='Save Member';
+  }catch(err){
+    console.error('SAVE MEMBER ERROR',err);
+    toast(err.message||String(err));
+  }finally{if(btn)btn.disabled=false}
 }
-function clearMemberFormSafe(){const form=document.querySelector('#add-member-page form');if(form)form.reset();const i=document.getElementById('editMemberIndex');if(i)i.value='-1';const t=document.getElementById('memberFormTitle');if(t)t.innerHTML='<i class="fas fa-user-plus"></i> Add New Team Member';const b=document.getElementById('saveMemberBtn');if(b)b.textContent='Save Member';}
+
+function showMemberSuccessPopup(m){
+  let modal=document.getElementById('memberSuccessModal');
+  if(!modal){
+    modal=document.createElement('div');modal.id='memberSuccessModal';modal.className='tc-modal';
+    modal.innerHTML=`<div class="tc-modal-card" style="max-width:560px">
+      <div class="tc-modal-head"><div><div style="color:#1677ff;font-weight:800;font-size:12px">SUCCESS</div><h2 style="margin:5px 0 0">Member Added Successfully</h2></div><button class="tc-modal-close" onclick="closeMemberSuccessPopup()">✕</button></div>
+      <div style="padding:14px;background:#f8fbff;border:2px solid #173b8f;border-radius:14px"><div class="tc-detail-grid">
+        <div class="tc-detail"><small>Name</small><b id="memberSuccessName"></b></div>
+        <div class="tc-detail"><small>Employee ID</small><b id="memberSuccessId"></b></div>
+        <div class="tc-detail"><small>Password</small><b id="memberSuccessPassword"></b></div>
+        <div class="tc-detail"><small>Department</small><b id="memberSuccessDepartment"></b></div>
+        <div class="tc-detail"><small>Role</small><b id="memberSuccessRole"></b></div>
+        <div class="tc-detail"><small>Email</small><b id="memberSuccessEmail"></b></div>
+      </div></div><button class="btn-primary" style="width:100%;margin-top:16px" onclick="closeMemberSuccessPopup()">Done</button>
+    </div>`;
+    document.body.appendChild(modal);
+  }
+  document.getElementById('memberSuccessName').textContent=m.name;
+  document.getElementById('memberSuccessId').textContent=m.employeeId;
+  document.getElementById('memberSuccessPassword').textContent=m.password;
+  document.getElementById('memberSuccessDepartment').textContent=m.department;
+  document.getElementById('memberSuccessRole').textContent=m.role;
+  document.getElementById('memberSuccessEmail').textContent=m.email;
+  modal.classList.add('show');
+}
+function closeMemberSuccessPopup(){document.getElementById('memberSuccessModal')?.classList.remove('show')}
+
 function editMember(i){if(!isOwner())return;const m=APP.members[i];document.getElementById('editMemberIndex').value=i;document.getElementById('memberName').value=m.name;document.getElementById('memberRole').value=m.role;document.getElementById('memberEmail').value=m.email;document.getElementById('memberPhone').value=m.phone;document.getElementById('memberDepartment').value=String(m.department||'').toLowerCase()}
-async function deleteMember(i){if(!isOwner()||!confirm('Delete this member?'))return;APP.members.splice(i,1);try{await persist();renderAll();toast('Member deleted')}catch(e){toast(e.message||String(e))}}
-function addNotification(user,message,type){if(!APP.notifications[user])APP.notifications[user]=[];APP.notifications[user].unshift({message,type,createdAt:new Date().toISOString(),read:false})}
-function renderNotifications(){const list=APP.notifications?.[APP.currentUser?.name]||[];const unread=list.filter(x=>!x.read).length;document.getElementById('notifCount').textContent=unread;document.getElementById('notifList').innerHTML=list.length?list.slice(0,25).map(n=>`<div class="notif-item"><b>${escapeHtml(n.type||'Update')}</b> — ${escapeHtml(n.message)}<br><small style="color:var(--text-muted)">${new Date(n.createdAt).toLocaleString()}</small></div>`).join(''):'<p style="font-size:.75rem;color:var(--text-muted);text-align:center;padding:10px">No new notifications</p>'}
-function toggleNotificationDropdown(){document.getElementById('notifDropdown').classList.toggle('show');const list=APP.notifications?.[APP.currentUser?.name]||[];list.forEach(n=>n.read=true);renderNotifications()}
-function renderAnnouncements(){const list=APP.announcements||[];const el=document.getElementById('announcementList');if(!el)return;if(!list.length){el.innerHTML='<div class="announcement-empty">No announcements yet. Stay tuned for company updates.</div>';return}el.innerHTML=list.slice(0,10).map(a=>`<div class="announcement-card"><div class="ann-type">${escapeHtml(a.type)} • ${escapeHtml(a.createdByName||'Admin')}</div><h4>${escapeHtml(a.title)}</h4><div class="ann-desc">${safeRich(a.description)}</div><small>${a.createdAt?new Date(a.createdAt).toLocaleString():''}${a.fileUrl?` • <a href="${escapeHtml(a.fileUrl)}" target="_blank" style="color:#fff;text-decoration:underline">Attachment</a>`:''}</small></div>`).join('')}
-function openAnnouncementModal(){if(!isOwner()){toast('Only Owner can post announcements.');return}document.getElementById('announcementModal').classList.add('show')}
-function closeAnnouncementModal(){document.getElementById('announcementModal').classList.remove('show')}
-function selectAnnouncementType(btn){document.querySelectorAll('.event-chip').forEach(x=>x.classList.remove('active'));btn.classList.add('active');selectedAnnouncementType=btn.dataset.type}
-function execAnnouncementCmd(cmd){document.execCommand(cmd,false,null);document.getElementById('annDescription').focus()}
-async function publishAnnouncement(){if(!isOwner())return;const title=document.getElementById('annTitle').value.trim(),description=document.getElementById('annDescription').innerHTML.trim();if(!title||!description){toast('Add a title and description.');return}const f=document.getElementById('annFile').files[0];const btn=document.getElementById('publishAnnouncementBtn');btn.disabled=true;try{let fileUrl='';if(f)fileUrl=await uploadFile(f,'uploadTaskFile','Announcement');await api('createAnnouncement',{employeeId:APP.currentUser.employeeId,title,description,type:selectedAnnouncementType,fileUrl});document.getElementById('annTitle').value='';document.getElementById('annDescription').innerHTML='';document.getElementById('annFile').value='';closeAnnouncementModal();await loadData(true);toast('Announcement published')}catch(e){toast(e.message||String(e))}finally{btn.disabled=false}}
-async function renderReportSummary(){const el=document.getElementById('reportSummary');if(!el||!APP.currentUser)return;try{const employee=isOwner()?((document.getElementById('reportEmployee')||{}).value||'ALL'):APP.currentUser.name;const period=(document.getElementById('reportPeriod')||{}).value||'all';const r=await api('getTaskReport',{employeeId:APP.currentUser.employeeId,employee,period});const tasks=r.tasks||[];const p=tasks.filter(t=>String(t.status).toLowerCase()==='pending').length;const ip=tasks.filter(t=>String(t.status).toLowerCase()==='in progress').length;const c=tasks.filter(t=>String(t.status).toLowerCase()==='completed').length;el.innerHTML=`<span class="summary-pill">Total: ${tasks.length}</span><span class="summary-pill">Pending: ${p}</span><span class="summary-pill">In Progress: ${ip}</span><span class="summary-pill">Completed: ${c}</span>`}catch(e){}}
-async function downloadBase64File(base64,mimeType,fileName){
-  const binary=atob(base64);
-  const bytes=new Uint8Array(binary.length);
-  for(let i=0;i<binary.length;i++)bytes[i]=binary.charCodeAt(i);
-  const blob=new Blob([bytes],{type:mimeType||'application/octet-stream'});
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement('a');a.href=url;a.download=fileName||'TASK_COMMAND_REPORT';document.body.appendChild(a);a.click();a.remove();
-  setTimeout(()=>URL.revokeObjectURL(url),1500);
+async function deleteMember(i){
+  if(!isOwner()||!confirm('Delete this member?'))return;
+  const m=APP.members[i];
+  if(!m?.id){toast('Member database ID is missing. Refresh and try again.');return}
+  try{
+    const {error}=await supabaseClient.from('employees').update({is_active:false,updated_at:new Date().toISOString()}).eq('id',m.id);
+    if(error)throw sbError(error);
+    await loadData(true);toast('Member deactivated successfully');
+  }catch(e){toast(e.message||String(e))}
 }
 async function downloadTaskReport(kind){
   if(!APP.currentUser)return;
-  const buttons=document.querySelectorAll('.report-btn');buttons.forEach(b=>b.disabled=true);
+  const buttons=document.querySelectorAll('.report-btn');
+  buttons.forEach(b=>b.disabled=true);
   try{
-    if(kind==='xlsx'||kind==='pdf')await loadReportLibraries();
     const employee=isOwner()?((document.getElementById('reportEmployee')||{}).value||'ALL'):APP.currentUser.name;
     const period=(document.getElementById('reportPeriod')||{}).value||'all';
-    let tasks=[...(APP.tasks||[])];
-    if(employee!=='ALL')tasks=tasks.filter(t=>taskAssignedToMe(t,{name:employee,employeeId:employee})||String(t.assignedTo||'').toLowerCase().includes(String(employee).toLowerCase()));
-    const now=new Date();
-    const start=new Date(now);
-    if(period==='daily')start.setHours(0,0,0,0);
-    else if(period==='weekly')start.setDate(now.getDate()-6);
-    else if(period==='monthly')start.setDate(1);
-    if(period!=='all')tasks=tasks.filter(t=>{const d=new Date(t.createdAt||t.created_at||t.deadline||0);return !isNaN(d)&&d>=start;});
-    const rows=tasks.map(t=>({'Task ID':t.id||'','Task Type':t.taskType||'','Department':t.department||t.taskDepartment||'Other','Assigned To':taskAssignedToText(t),'Assigned By':t.createdByName||t.createdBy||'','Priority':t.priority||'Medium','Deadline':t.deadline||'','Status':t.status||'Pending','Created At':t.createdAt||'','Completed At':t.completedAt||''}));
+    const r=await api('getTaskReport',{employeeId:APP.currentUser.employeeId,employee,period});
+    const tasks=r.tasks||[];
+    const rows=tasks.map(t=>({
+      'Task ID':t.id||'',
+      'Task Type':t.taskType||'',
+      'Department':t.department||t.taskDepartment||'Other',
+      'Assigned To':taskAssignedToText(t),
+      'Assigned By':t.createdByName||'',
+      'Follow-up':t.followUpTo||'',
+      'Priority':t.priority||'Medium',
+      'Deadline':t.deadline||'',
+      'Status':t.status||'Pending',
+      'Created At':t.createdAt||'',
+      'Completed At':t.completedAt||''
+    }));
     const stamp=new Date().toISOString().replace(/[:.]/g,'-').slice(0,19);
-    const base='TASK_COMMAND_'+String(employee).replace(/[^a-z0-9]+/gi,'_')+'_'+period+'_'+stamp;
-    if(kind==='csv'){const headers=Object.keys(rows[0]||{'Task ID':'','Task Type':'','Department':'','Assigned To':'','Assigned By':'','Priority':'','Deadline':'','Status':'','Created At':'','Completed At':''});const csv=[headers.join(','),...rows.map(r=>headers.map(h=>'"'+String(r[h]??'').replace(/"/g,'""')+'"').join(','))].join('
-');const a=document.createElement('a');const u=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));a.href=u;a.download=base+'.csv';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),1000);toast('CSV downloaded');return;}
-    if(kind==='xlsx'){if(!window.XLSX)throw new Error('Excel library is not loaded.');const ws=XLSX.utils.json_to_sheet(rows);const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Task Report');XLSX.writeFile(wb,base+'.xlsx');toast('Excel downloaded');return;}
-    if(kind==='pdf'){if(!window.jspdf?.jsPDF)throw new Error('PDF library is not loaded.');const doc=new jspdf.jsPDF({orientation:'landscape',unit:'pt',format:'a4'});doc.setFontSize(18);doc.text('TASK COMMAND - TASK REPORT',40,35);doc.setFontSize(9);doc.text('Employee: '+employee+' | Period: '+period.toUpperCase()+' | Generated: '+new Date().toLocaleString(),40,52);const body=tasks.map(t=>[t.id||'',t.taskType||'',taskAssignedToText(t),t.priority||'Medium',t.deadline||'',t.status||'Pending']);if(typeof doc.autoTable==='function'){doc.autoTable({head:[['Task ID','Task','Assigned To','Priority','Deadline','Status']],body,startY:70,styles:{fontSize:7,cellPadding:4},headStyles:{fillColor:[8,42,110],textColor:255}});}else{let y=80;doc.setFontSize(7);body.forEach(r=>{doc.text(r.map(x=>String(x).slice(0,20)).join(' | '),40,y);y+=12;if(y>550){doc.addPage();y=40;}});}doc.save(base+'.pdf');toast('PDF downloaded');return;}
-    throw new Error('Unsupported report format.');
-  }catch(e){console.error('report',e);toast(e.message||String(e));}finally{buttons.forEach(b=>b.disabled=false);}
+    const base='TASK_COMMAND_'+String(employee||'ALL').replace(/[^a-z0-9]+/gi,'_')+'_'+period+'_'+stamp;
+
+    if(kind==='csv'){
+      const headers=Object.keys(rows[0]||{
+        'Task ID':'','Task Type':'','Department':'','Assigned To':'','Assigned By':'',
+        'Follow-up':'','Priority':'','Deadline':'','Status':'','Created At':'','Completed At':''
+      });
+      const csv=[headers.join(','),...rows.map(row=>headers.map(h=>{
+        const v=String(row[h]??'').replace(/"/g,'""');
+        return '"'+v+'"';
+      }).join(','))].join('\r\n');
+      const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
+      const url=URL.createObjectURL(blob);
+      const a=document.createElement('a');a.href=url;a.download=base+'.csv';a.click();
+      setTimeout(()=>URL.revokeObjectURL(url),1000);
+      toast('CSV downloaded — '+tasks.length+' task(s)');
+      return;
+    }
+
+    if(kind==='xlsx'){
+      if(!window.XLSX)throw new Error('Excel export library is not loaded. Refresh the page and try again.');
+      const ws=XLSX.utils.json_to_sheet(rows);
+      const wb=XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb,ws,'Task Report');
+      XLSX.writeFile(wb,base+'.xlsx');
+      toast('Excel downloaded — '+tasks.length+' task(s)');
+      return;
+    }
+
+    if(kind==='pdf'){
+      if(!window.jspdf?.jsPDF)throw new Error('PDF export library is not loaded. Refresh the page and try again.');
+      const doc=new jspdf.jsPDF({orientation:'landscape',unit:'pt',format:'a4'});
+      doc.setFontSize(20);
+      doc.setTextColor(23,59,143);
+      doc.text('TASK COMMAND',doc.internal.pageSize.getWidth()/2,38,{align:'center'});
+      doc.setFontSize(11);
+      doc.setTextColor(91,55,255);
+      doc.text('TASK PERFORMANCE REPORT',doc.internal.pageSize.getWidth()/2,56,{align:'center'});
+      doc.setFontSize(9);
+      doc.setTextColor(100,116,139);
+      doc.text('Employee: '+employee+'   •   Period: '+String(period).toUpperCase()+'   •   Generated: '+new Date().toLocaleString(),doc.internal.pageSize.getWidth()/2,72,{align:'center'});
+
+      const total=tasks.length;
+      const completed=tasks.filter(t=>String(t.status).toLowerCase()==='completed').length;
+      const pending=tasks.filter(t=>String(t.status).toLowerCase()==='pending').length;
+      const progress=tasks.filter(t=>String(t.status).toLowerCase()==='in progress').length;
+
+      doc.setFontSize(10);
+      doc.setTextColor(23,32,51);
+      doc.text('Total: '+total+'    Completed: '+completed+'    Pending: '+pending+'    In Progress: '+progress,40,96);
+
+      const head=[['TASK ID','TASK TYPE','DEPARTMENT','ASSIGNED TO','ASSIGNED BY','PRIORITY','DEADLINE','STATUS']];
+      const body=tasks.map(t=>[
+        t.id||'',
+        t.taskType||'',
+        t.department||t.taskDepartment||'Other',
+        taskAssignedToText(t),
+        t.createdByName||'—',
+        t.priority||'Medium',
+        t.deadline||'—',
+        t.status||'Pending'
+      ]);
+
+      if(typeof doc.autoTable==='function'){
+        doc.autoTable({
+          head,
+          body,
+          startY:110,
+          styles:{fontSize:7,cellPadding:4},
+          headStyles:{fillColor:[23,59,143],textColor:255},
+          alternateRowStyles:{fillColor:[247,249,252]}
+        });
+      }else{
+        let y=115;
+        doc.setFontSize(7);
+        head[0].forEach((h,i)=>doc.text(h,40+i*90,y));
+        y+=14;
+        body.forEach(row=>{
+          row.forEach((v,i)=>doc.text(String(v).slice(0,18),40+i*90,y));
+          y+=12;
+          if(y>550){doc.addPage();y=40;}
+        });
+      }
+
+      doc.save(base+'.pdf');
+      toast('PDF downloaded — '+tasks.length+' task(s)');
+      return;
+    }
+
+    throw new Error('Unknown report format.');
+  }catch(e){
+    toast(e.message||String(e));
+  }finally{
+    buttons.forEach(b=>b.disabled=false);
+  }
 }
 
 function updateProfileUI(){const m=APP.currentUser;if(!m)return;document.getElementById('userProfileName').textContent=m.name;document.getElementById('sidebarUserName').textContent=m.name;document.getElementById('sidebarUserRole').textContent=m.role||'Active User';document.getElementById('sidebarUserRole2').textContent=m.role||'Active User';document.getElementById('sidebarUserDepartment').textContent=m.department?('Department: '+m.department):'';document.getElementById('headerUserDepartment').textContent=m.department?('Department: '+m.department):'';const ld=document.getElementById('loginDepartment');if(ld){ld.textContent=m.department?'Department: '+m.department:'';ld.style.display=m.department?'block':'none'}setAvatar('headerAvatar',m);setAvatar('sidebarAvatar',m);fillProfile(m)}
@@ -707,30 +658,10 @@ function openProfileModal(){if(APP.currentUser){fillProfile(APP.currentUser);doc
 function closeProfileModal(){document.getElementById('profileModal').classList.remove('show');closeProfileEdit()}
 function toggleProfileEdit(){const p=document.getElementById('profileEditPanel');p.style.display=p.style.display==='none'?'block':'none';const m=APP.currentUser;if(m){document.getElementById('editProfileName').value=m.name;document.getElementById('editProfileRole').value=m.role;document.getElementById('editProfilePhone').value=m.phone;document.getElementById('editProfileEmail').value=m.email}}
 function closeProfileEdit(){document.getElementById('profileEditPanel').style.display='none'}
-async function saveProfileChanges(){
-  const m=APP.currentUser;if(!m)return;
-  const name=(document.getElementById('editProfileName')?.value||m.name||'').trim();
-  const role=(document.getElementById('editProfileRole')?.value||m.role||'').trim();
-  const phone=(document.getElementById('editProfilePhone')?.value||'').trim();
-  const email=(document.getElementById('editProfileEmail')?.value||'').trim();
-  try{
-    const q=await supabaseClient.from('employees').update({name,role,email,phone}).eq('login_id',m.employeeId).select('*').maybeSingle();
-    if(q.error)throw sbError(q.error);
-    const updated=q.data||{...m,name,role,email,phone};
-    APP.currentUser={...m,name,role,email,phone,...updated};
-    APP.members=APP.members.map(x=>x.employeeId===m.employeeId?{...x, name,role,email,phone,...updated}:x);
-    updateProfileUI();fillProfile(APP.currentUser);closeProfileEdit();toast('Profile details saved successfully');
-  }catch(e){
-    try{
-      const res=await api('updateOwnProfile',{employeeId:m.employeeId,phone,email,photo:m.photo||''});
-      APP.currentUser={...m,name,role,email,phone,...(res?.member||{})};
-      updateProfileUI();fillProfile(APP.currentUser);closeProfileEdit();toast('Profile details saved successfully');
-    }catch(f){toast(e.message||f.message||String(f));}
-  }
-}
+async function saveProfileChanges(){const m=APP.currentUser;if(!m)return;try{const res=await api('updateOwnProfile',{employeeId:m.employeeId,role:m.role,phone:document.getElementById('editProfilePhone').value.trim(),email:document.getElementById('editProfileEmail').value.trim(),photo:m.photo||''});APP.currentUser=res.member;APP.members=APP.members.map(x=>x.employeeId===m.employeeId?res.member:x);updateProfileUI();closeProfileEdit();toast('Profile updated')}catch(e){toast(e.message||e)}}
 async function uploadProfilePhoto(e){const f=e.target.files[0];if(!f||!APP.currentUser)return;try{const url=await uploadFile(f,'uploadPhoto',APP.currentUser.name);const res=await api('updateOwnProfile',{employeeId:APP.currentUser.employeeId,phone:APP.currentUser.phone,email:APP.currentUser.email,photo:url});APP.currentUser=res.member;APP.members=APP.members.map(x=>x.employeeId===APP.currentUser.employeeId?res.member:x);updateProfileUI();fillProfile(APP.currentUser);toast('Profile photo updated successfully')}catch(err){toast(err.message||err)}e.target.value=''}
 function execCmd(cmd){document.execCommand(cmd,false,null);document.getElementById('fullDescription').focus()}
-document.addEventListener('keydown',e=>{if(e.key==='Enter'&&(document.activeElement===document.getElementById('loginEmployeeId')||document.activeElement===document.getElementById('loginPassword')))login();if(e.key==='Escape'){closeTaskDetails();closeAnnouncementModal();closeAnnouncementDetails();closeEmployeePanel();closeMemberSuccessPopup()}});
+document.addEventListener('keydown',e=>{if(e.key==='Enter'&&(document.activeElement===document.getElementById('loginEmployeeId')||document.activeElement===document.getElementById('loginPassword')))login();if(e.key==='Escape'){closeTaskDetails();closeAnnouncementModal()}});
 window.addEventListener('load',init);
 
 document.addEventListener('click',function(e){const wrap=document.getElementById('multiAssignee');if(wrap&&!wrap.contains(e.target))closeAssigneePicker();});
