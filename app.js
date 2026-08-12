@@ -283,8 +283,16 @@ function ensureFeatureUI(){
     s.id='tcFeatureStyles';
     s.textContent=`
       .tc-kpi-card{border:2px solid rgba(22,119,255,.38)!important;box-shadow:0 8px 24px rgba(22,119,255,.08)!important}
-      .announcement-card{cursor:pointer;transition:.2s}
+      .announcement-card{cursor:pointer;transition:.2s;position:relative}
       .announcement-card:hover{transform:translateY(-2px);box-shadow:0 12px 28px rgba(22,119,255,.14)}
+      .announcement-card:after{content:'Click to read full announcement';display:block;margin-top:10px;font-size:11px;font-weight:700;opacity:.78}
+      .tc-announcement-modal-card{width:min(980px,96vw)!important;max-height:92vh!important;padding:0!important;overflow:hidden!important}
+      .tc-announcement-body{max-height:calc(92vh - 150px);overflow:auto;padding:24px 28px 30px}
+      .tc-announcement-body img{max-width:100%;height:auto;border-radius:12px}
+      .tc-announcement-body table{max-width:100%;overflow:auto;display:block}
+      .notif-item{cursor:pointer;border-radius:10px;padding:10px 12px;margin:4px 0;transition:.15s}
+      .notif-item:hover{background:#f1f5f9}
+      .notif-unread{background:#eef5ff;font-weight:600}
       .tc-modal{display:none;position:fixed;inset:0;background:rgba(2,8,28,.72);backdrop-filter:blur(8px);z-index:100000;align-items:center;justify-content:center;padding:20px}
       .tc-modal.show{display:flex}
       .tc-modal-card{width:min(720px,96vw);max-height:90vh;overflow:auto;background:#fff;border-radius:24px;box-shadow:0 30px 90px rgba(0,0,0,.35);padding:26px}
@@ -304,14 +312,13 @@ function ensureFeatureUI(){
     const m=document.createElement('div');
     m.id='announcementDetailsModal';m.className='tc-modal';
     m.onclick=e=>{if(e.target===m)closeAnnouncementDetails()};
-    m.innerHTML=`<div class="tc-modal-card">
-      <div class="tc-modal-head"><div><div id="announcementDetailType" style="color:#1677ff;font-weight:800;font-size:12px"></div><h2 id="announcementDetailTitle" style="margin:5px 0 0"></h2></div><button class="tc-modal-close" onclick="closeAnnouncementDetails()">✕</button></div>
-      <div class="tc-detail-grid">
-        <div class="tc-detail"><small>Published By</small><b id="announcementDetailAuthor">—</b></div>
-        <div class="tc-detail"><small>Date / Time</small><b id="announcementDetailDate">—</b></div>
+    m.innerHTML=`<div class="tc-modal-card tc-announcement-modal-card">
+      <div class="tc-modal-head" style="padding:20px 28px;margin:0"><div><div id="announcementDetailType" style="color:#1677ff;font-weight:800;font-size:12px"></div><h2 id="announcementDetailTitle" style="margin:5px 0 0"></h2></div><button class="tc-modal-close" onclick="closeAnnouncementDetails()">✕</button></div>
+      <div class="tc-announcement-body">
+        <div class="tc-detail-grid"><div class="tc-detail"><small>Published By</small><b id="announcementDetailAuthor">—</b></div><div class="tc-detail"><small>Date / Time</small><b id="announcementDetailDate">—</b></div></div>
+        <div style="margin-top:18px;padding:20px;border:1px solid #e5e7eb;border-radius:16px;background:#fafbff"><div id="announcementDetailDescription"></div></div>
+        <a id="announcementDetailFile" class="btn-primary" style="display:none;margin-top:16px;text-decoration:none;text-align:center" target="_blank">Open Attachment</a>
       </div>
-      <div style="margin-top:16px;padding:16px;border:1px solid #e5e7eb;border-radius:14px"><div id="announcementDetailDescription"></div></div>
-      <a id="announcementDetailFile" class="btn-primary" style="display:none;margin-top:16px;text-decoration:none;text-align:center" target="_blank">Open Attachment</a>
     </div>`;
     document.body.appendChild(m);
   }
@@ -400,7 +407,18 @@ function applyRoleUI(){const owner=isOwner();document.querySelectorAll('.owner-o
 function logout(){stopLiveRefresh();localStorage.removeItem('taskCommandUserId');localStorage.removeItem('taskCommandSession');APP.currentUser=null;APP.sessionToken='';document.getElementById('appDashboard').style.display='none';document.getElementById('loginScreen').style.display='flex';document.getElementById('loginEmployeeId').value='';document.getElementById('loginPassword').value='';document.getElementById('loginDepartmentSelect').value=''}
 function showLoginError(msg){const e=document.getElementById('loginError');e.textContent=msg;e.style.display='block'}
 async function loadData(silent=false){if(!APP.currentUser||isLoading)return;isLoading=true;try{const data=await direct('getData',{employeeId:APP.currentUser.employeeId});APP={...APP,...data};APP.currentUser=data.currentUser||APP.currentUser;applyRoleUI();renderAll();updateProfileUI();if(!silent)toast('Data refreshed')}catch(e){if(!silent)toast(e.message||e)}finally{isLoading=false}}
-async function loadLive(silent=true){if(!APP.currentUser||isLoading)return;isLoading=true;try{const data=await direct('getLiveUpdates',{employeeId:APP.currentUser.employeeId});APP.tasks=data.tasks||[];APP.notifications=data.notifications||{};APP.announcements=data.announcements||APP.announcements;renderTasks();renderNotifications();renderAnnouncements();if(!silent)toast('Updated')}catch(e){}finally{isLoading=false}}
+async function loadDirectNotifications(){
+  try{
+    const loginId=String(APP.currentUser?.employeeId||'').trim(); if(!loginId)return;
+    let employeeId=APP.currentUser?.id||APP.currentUser?.employee_id||'';
+    if(!employeeId){const r=await supabaseClient.from('employees').select('id').eq('login_id',loginId).maybeSingle();if(r.error)throw r.error;employeeId=r.data?.id||'';}
+    if(!employeeId)return;
+    const r=await supabaseClient.from('notifications').select('id,type,title,message,is_read,created_at').eq('employee_id',employeeId).order('created_at',{ascending:false}).limit(25);
+    if(r.error)throw r.error;
+    const name=APP.currentUser?.name||loginId;APP.notifications=APP.notifications||{};APP.notifications[name]=(r.data||[]).map(n=>({id:n.id,type:n.type||'Update',title:n.title||n.type||'Notification',message:n.message||'',createdAt:n.created_at||'',read:!!n.is_read}));
+  }catch(e){console.warn('Direct notification refresh failed:',e)}
+}
+async function loadLive(silent=true){if(!APP.currentUser||isLoading)return;isLoading=true;try{const data=await direct('getLiveUpdates',{employeeId:APP.currentUser.employeeId});APP.tasks=data.tasks||[];APP.notifications=data.notifications||{};APP.announcements=data.announcements||APP.announcements;await loadDirectNotifications();renderTasks();renderNotifications();renderAnnouncements();if(!silent)toast('Updated')}catch(e){console.warn('Live update failed:',e);await loadDirectNotifications();renderNotifications()}finally{isLoading=false}}
 function startLiveRefresh(){stopLiveRefresh();liveRefreshTimer=setInterval(()=>{if(document.visibilityState==='visible'){renderGreeting();loadLive(true)}},3000)}
 function stopLiveRefresh(){if(liveRefreshTimer)clearInterval(liveRefreshTimer);liveRefreshTimer=null}
 function renderAll(){populateAssignees();renderDashboardStats();renderGreeting();renderTasks();renderMembers();renderTeamList();renderNotifications();renderAnnouncements();renderReportSummary()}
@@ -536,6 +554,13 @@ async function deleteMember(i){
     await loadData(true);toast('Member deactivated successfully');
   }catch(e){toast(e.message||String(e))}
 }
+function renderNotifications(){const list=APP.notifications?.[APP.currentUser?.name]||[];const unread=list.filter(x=>!x.read).length;const count=document.getElementById('notifCount');const box=document.getElementById('notifList');if(count)count.textContent=unread;if(!box)return;box.innerHTML=list.length?list.slice(0,25).map((n,i)=>`<div class="notif-item ${n.read?'':'notif-unread'}" onclick="openNotificationDetails(${i})"><b>${escapeHtml(n.title||n.type||'Update')}</b>${n.message?` — ${escapeHtml(n.message)}`:''}<br><small style="color:var(--text-muted)">${n.createdAt?new Date(n.createdAt).toLocaleString():''}</small></div>`).join(''):'<p style="font-size:.75rem;color:var(--text-muted);text-align:center;padding:10px">No new notifications</p>'}
+function toggleNotificationDropdown(){const box=document.getElementById('notifDropdown');if(!box)return;box.classList.toggle('show');renderNotifications()}
+function openNotificationDetails(i){const list=APP.notifications?.[APP.currentUser?.name]||[];const n=list[i];if(!n)return;n.read=true;renderNotifications();if(n.id){supabaseClient.from('notifications').update({is_read:true}).eq('id',n.id).then(()=>{}).catch(()=>{})}toast((n.title||n.type||'Notification')+': '+(n.message||''))}
+function renderAnnouncements(){const list=APP.announcements||[];const el=document.getElementById('announcementList');if(!el)return;if(!list.length){el.innerHTML='<div class="announcement-empty">No announcements yet. Stay tuned for company updates.</div>';return}el.innerHTML=list.slice(0,10).map((a,i)=>`<div class="announcement-card" onclick="openAnnouncementDetails(${i})"><div class="ann-type">${escapeHtml(a.type||'Announcement')} • ${escapeHtml(a.createdByName||'Admin')}</div><h4>${escapeHtml(a.title)}</h4><div class="ann-desc">${safeRich(a.description)}</div><small>${a.createdAt?new Date(a.createdAt).toLocaleString():''}${a.fileUrl?` • <a href="${escapeHtml(a.fileUrl)}" target="_blank" onclick="event.stopPropagation()" style="color:#fff;text-decoration:underline">Attachment</a>`:''}</small></div>`).join('')}
+function openAnnouncementDetails(i){const a=(APP.announcements||[])[i];if(!a)return;ensureFeatureUI();document.getElementById('announcementDetailType').textContent=(a.type||'Announcement')+' • '+(a.createdByName||'Admin');document.getElementById('announcementDetailTitle').textContent=a.title||'Announcement';document.getElementById('announcementDetailAuthor').textContent=a.createdByName||'Admin';document.getElementById('announcementDetailDate').textContent=a.createdAt?new Date(a.createdAt).toLocaleString():'—';document.getElementById('announcementDetailDescription').innerHTML=safeRich(a.description||'');const file=document.getElementById('announcementDetailFile');if(a.fileUrl){file.href=a.fileUrl;file.style.display='block'}else{file.style.display='none';file.removeAttribute('href')}document.getElementById('announcementDetailsModal').classList.add('show')}
+function closeAnnouncementDetails(){document.getElementById('announcementDetailsModal')?.classList.remove('show')}
+
 async function downloadTaskReport(kind){
   if(!APP.currentUser)return;
   const buttons=document.querySelectorAll('.report-btn');
@@ -666,7 +691,7 @@ function closeProfileEdit(){document.getElementById('profileEditPanel').style.di
 async function saveProfileChanges(){const m=APP.currentUser;if(!m)return;try{const res=await api('updateOwnProfile',{employeeId:m.employeeId,role:m.role,phone:document.getElementById('editProfilePhone').value.trim(),email:document.getElementById('editProfileEmail').value.trim(),photo:m.photo||''});APP.currentUser=res.member;APP.members=APP.members.map(x=>x.employeeId===m.employeeId?res.member:x);updateProfileUI();closeProfileEdit();toast('Profile updated')}catch(e){toast(e.message||e)}}
 async function uploadProfilePhoto(e){const f=e.target.files[0];if(!f||!APP.currentUser)return;try{const url=await uploadFile(f,'uploadPhoto',APP.currentUser.name);const res=await api('updateOwnProfile',{employeeId:APP.currentUser.employeeId,phone:APP.currentUser.phone,email:APP.currentUser.email,photo:url});APP.currentUser=res.member;APP.members=APP.members.map(x=>x.employeeId===APP.currentUser.employeeId?res.member:x);updateProfileUI();fillProfile(APP.currentUser);toast('Profile photo updated successfully')}catch(err){toast(err.message||err)}e.target.value=''}
 function execCmd(cmd){document.execCommand(cmd,false,null);document.getElementById('fullDescription').focus()}
-document.addEventListener('keydown',e=>{if(e.key==='Enter'&&(document.activeElement===document.getElementById('loginEmployeeId')||document.activeElement===document.getElementById('loginPassword')))login();if(e.key==='Escape'){closeTaskDetails();closeAnnouncementModal()}});
+document.addEventListener('keydown',e=>{if(e.key==='Enter'&&(document.activeElement===document.getElementById('loginEmployeeId')||document.activeElement===document.getElementById('loginPassword')))login();if(e.key==='Escape'){closeTaskDetails();closeAnnouncementModal();closeAnnouncementDetails()}});
 window.addEventListener('load',init);
 
 document.addEventListener('click',function(e){const wrap=document.getElementById('multiAssignee');if(wrap&&!wrap.contains(e.target))closeAssigneePicker();});
