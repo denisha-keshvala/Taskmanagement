@@ -1,187 +1,184 @@
-
-/* TASK COMMAND - LIVE DESKTOP NOTIFICATION FIX V7
-   Add this AFTER app.js in index.html:
-   <script src="notification-live-fix.js"></script>
+/* TASK COMMAND - LOGIN FIX V8
+   Load AFTER supabase-config.js and AFTER app.js.
+   It deliberately does not change the page design.
 */
-
 (function () {
   'use strict';
 
-  let liveNotificationChannel = null;
-  const seenKey = 'taskCommandSeenNotificationIds';
+  function el(id) { return document.getElementById(id); }
 
-  function currentEmployeeId() {
-    try {
-      if (typeof me === 'function') {
-        const u = me();
-        if (u && u.id) return String(u.id);
-      }
-    } catch (_) {}
-
-    try {
-      if (window.APP && APP.currentUser && APP.currentUser.id) {
-        return String(APP.currentUser.id);
-      }
-    } catch (_) {}
-
-    return '';
-  }
-
-  function isVisibleToCurrentUser(row) {
-    const id = currentEmployeeId();
-    if (!id || !row) return false;
-
-    // Notifications are employee-specific.
-    return String(row.employee_id || '') === id;
-  }
-
-  function rememberNotification(id) {
-    if (!id) return false;
-
-    try {
-      const arr = JSON.parse(localStorage.getItem(seenKey) || '[]');
-      if (arr.includes(String(id))) return false;
-
-      arr.push(String(id));
-      while (arr.length > 100) arr.shift();
-      localStorage.setItem(seenKey, JSON.stringify(arr));
-      return true;
-    } catch (_) {
-      return true;
+  function showLoginError(message) {
+    const box = el('loginError');
+    if (box) {
+      box.textContent = message || 'Login failed.';
+      box.style.display = 'block';
     }
   }
 
-  function browserNotify(row) {
-    if (!('Notification' in window)) return;
+  function normalizeMember(raw) {
+    if (!raw) return null;
 
-    const title = row.title || 'Task Command';
-    const body = row.message || 'You have a new notification.';
-
-    if (Notification.permission === 'granted') {
-      try {
-        const n = new Notification(title, {
-          body,
-          icon: 'https://denisha-keshvala.github.io/Taskmanagement/favicon.png',
-          tag: 'task-command-' + String(row.id || Date.now()),
-          renotify: true
-        });
-
-        n.onclick = function () {
-          try {
-            window.focus();
-            n.close();
-          } catch (_) {}
-        };
-      } catch (_) {}
+    // Current Supabase RPC returns { ok, member, sessionToken }.
+    if (raw.member) {
+      const m = raw.member;
+      return {
+        id: m.id || m.uuid || m.employee_id || '',
+        name: m.name || '',
+        login_id: m.login_id || m.employeeId || '',
+        role: m.role || 'employee',
+        department: m.department || '',
+        email: m.email || '',
+        phone: m.phone || '',
+        profile_photo_url: m.profile_photo_url || m.photo || '',
+        is_active: m.is_active !== false
+      };
     }
+
+    // Also support a direct row return.
+    return {
+      id: raw.id || '',
+      name: raw.name || '',
+      login_id: raw.login_id || raw.employeeId || '',
+      role: raw.role || 'employee',
+      department: raw.department || '',
+      email: raw.email || '',
+      phone: raw.phone || '',
+      profile_photo_url: raw.profile_photo_url || raw.photo || '',
+      is_active: raw.is_active !== false
+    };
   }
 
-  async function askNotificationPermissionFromUserGesture() {
-    if (!('Notification' in window)) return;
+  async function fixedLogin() {
+    const login = (el('loginId')?.value || '').trim();
+    const password = el('loginPass')?.value || '';
 
-    if (Notification.permission === 'default') {
-      try {
-        await Notification.requestPermission();
-      } catch (_) {}
-    }
-  }
-
-  function startLiveNotifications() {
-    if (!window.supabaseClient || typeof supabaseClient.channel !== 'function') {
-      console.warn('Task Command: Supabase client is not ready for live notifications.');
+    if (!login || !password) {
+      showLoginError('Please enter login ID and password.');
       return;
     }
 
-    if (liveNotificationChannel) {
-      try {
-        supabaseClient.removeChannel(liveNotificationChannel);
-      } catch (_) {}
+    const btn = document.querySelector('#loginScreen button[onclick*="handleLogin"], .login-box button.btn-primary');
+    if (btn) {
+      btn.disabled = true;
+      btn.dataset.oldText = btn.innerHTML;
+      btn.innerHTML = 'Logging in...';
     }
 
-    const channelName =
-      'task-command-notifications-' +
-      Math.random().toString(36).slice(2) +
-      '-' + Date.now();
+    try {
+      if (!window.supabaseClient || typeof supabaseClient.rpc !== 'function') {
+        throw new Error('Supabase client is not initialized.');
+      }
 
-    liveNotificationChannel = supabaseClient
-      .channel(channelName)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'notifications'
-        },
-        function (payload) {
-          const row = payload && payload.new ? payload.new : null;
-          if (!row || !isVisibleToCurrentUser(row)) return;
-
-          // Prevent duplicate desktop notifications when the app is open
-          // in more than one tab.
-          if (!rememberNotification(row.id)) return;
-
-          // IMPORTANT: show the desktop notification immediately.
-          // Do NOT wait for loadAllData()/refreshRealtime().
-          browserNotify(row);
-
-          // Refresh the notification list/UI separately.
-          try {
-            if (typeof loadAllData === 'function') {
-              loadAllData().catch(function (e) {
-                console.warn('Notification UI refresh failed:', e);
-              });
-            }
-          } catch (_) {}
-        }
-      )
-      .subscribe(function (status) {
-        console.log('Task Command live notification channel:', status);
+      // IMPORTANT: the verified database function is 2-parameter:
+      // login_employee(p_login_id text, p_password text)
+      const result = await supabaseClient.rpc('login_employee', {
+        p_login_id: login,
+        p_password: password
       });
-  }
 
-  function stopLiveNotifications() {
-    if (liveNotificationChannel && window.supabaseClient) {
-      try {
-        supabaseClient.removeChannel(liveNotificationChannel);
-      } catch (_) {}
+      if (result.error) throw result.error;
+
+      const data = result.data;
+      const response = Array.isArray(data) ? data[0] : data;
+
+      if (!response || response.ok === false) {
+        throw new Error(response?.message || 'Invalid login ID or password.');
+      }
+
+      const member = normalizeMember(response.member || response);
+
+      if (!member || !member.id) {
+        throw new Error('Login succeeded but employee data was not returned.');
+      }
+
+      const token =
+        response.sessionToken ||
+        response.session_token ||
+        response.token ||
+        '';
+
+      // Support the newer APP-based app.js.
+      if (window.APP) {
+        APP.currentUser = member;
+        APP.sessionToken = token;
+      }
+
+      localStorage.setItem('taskCommandUserId', member.id);
+      if (token) localStorage.setItem('taskCommandSession', token);
+
+      // Support the older app.js variables/functions when present.
+      if ('loggedEmployee' in window) window.loggedEmployee = member;
+      if ('loggedUser' in window) window.loggedUser = member.name;
+
+      if (window.STORAGE && STORAGE.loggedUser) {
+        localStorage.setItem(STORAGE.loggedUser, member.name);
+      } else {
+        localStorage.setItem('taskCommandUser', member.name);
+      }
+
+      // Load the actual employee data before opening dashboard.
+      if (typeof window.loadAllData === 'function') {
+        await window.loadAllData();
+      } else if (typeof window.api === 'function') {
+        const fresh = await window.api('getData', {
+          employeeId: member.id,
+          sessionToken: token
+        });
+        if (fresh && window.APP) {
+          APP.members = fresh.members || [];
+          APP.tasks = fresh.tasks || [];
+          APP.notifications = fresh.notifications || {};
+          APP.announcements = fresh.announcements || [];
+          APP.currentUser = fresh.currentUser || member;
+        }
+      }
+
+      if (typeof window.showApp === 'function') {
+        window.showApp();
+      } else {
+        const loginScreen = el('loginScreen');
+        const dashboard = el('appDashboard');
+        if (loginScreen) loginScreen.style.display = 'none';
+        if (dashboard) dashboard.style.display = 'flex';
+      }
+
+      if (typeof window.subscribeRealtime === 'function') window.subscribeRealtime();
+      if (typeof window.requestNotificationPermission === 'function') {
+        window.requestNotificationPermission();
+      }
+      if (typeof window.startReminderChecks === 'function') {
+        window.startReminderChecks();
+      }
+
+    } catch (err) {
+      console.error('LOGIN FIX V8:', err);
+      showLoginError(err?.message || 'Login failed.');
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = btn.dataset.oldText || 'LOGIN';
+      }
     }
-    liveNotificationChannel = null;
   }
 
-  // Permission must be requested from a real user interaction in browsers
-  // that restrict automatic permission prompts.
-  document.addEventListener(
-    'click',
-    function () {
-      askNotificationPermissionFromUserGesture();
-    },
-    { once: true, passive: true }
-  );
+  // Override the broken/old handler.
+  window.handleLogin = fixedLogin;
 
-  document.addEventListener(
-    'keydown',
-    function () {
-      askNotificationPermissionFromUserGesture();
-    },
-    { once: true, passive: true }
-  );
+  document.addEventListener('DOMContentLoaded', function () {
+    const pass = el('loginPass');
+    if (pass) {
+      pass.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') fixedLogin();
+      });
+    }
 
-  window.addEventListener('beforeunload', stopLiveNotifications);
-
-  // Start after the existing app has initialized Supabase/login state.
-  window.addEventListener('load', function () {
-    setTimeout(startLiveNotifications, 1200);
+    const button = document.querySelector('#loginScreen button.btn-primary, .login-box button.btn-primary');
+    if (button) {
+      // Remove inline-handler ambiguity and use one guaranteed listener.
+      button.addEventListener('click', function (e) {
+        e.preventDefault();
+        fixedLogin();
+      });
+    }
   });
-
-  // Reconnect if the browser/network temporarily disconnects.
-  window.addEventListener('online', function () {
-    setTimeout(startLiveNotifications, 500);
-  });
-
-  // Expose helpers for testing.
-  window.TaskCommandLiveNotifications = {
-    start: startLiveNotifications,
-    stop: stopLiveNotifications,
-    requestPermission: askNotificationPermissionFromUserGesture
-  };
 })();
