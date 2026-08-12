@@ -15,6 +15,33 @@ function sbError(error) {
 
 function getSessionToken(){return APP.sessionToken || localStorage.getItem('taskCommandSession') || '';}
 
+// Keep one status vocabulary in the UI even though Supabase stores
+// task_status enum values in kebab-case (in-progress) while the UI shows
+// human-readable labels (In Progress).
+function normalizeTaskStatus(status){
+  const v=String(status ?? '').trim().toLowerCase().replace(/[_-]+/g,' ');
+  if(v==='in progress'||v==='progress'||v==='inprogress') return 'In Progress';
+  if(v==='completed'||v==='complete'||v==='done') return 'Completed';
+  if(v==='pending'||v==='') return 'Pending';
+  if(v==='cancelled'||v==='canceled') return 'Cancelled';
+  if(v==='overdue') return 'Overdue';
+  return String(status || 'Pending').trim() || 'Pending';
+}
+
+function statusForDatabase(status){
+  const v=normalizeTaskStatus(status);
+  if(v==='In Progress') return 'in-progress';
+  if(v==='Completed') return 'completed';
+  if(v==='Cancelled') return 'cancelled';
+  if(v==='Overdue') return 'overdue';
+  return 'pending';
+}
+
+function normalizeTaskForUi(task){
+  if(!task || typeof task!=='object') return task;
+  return {...task,status:normalizeTaskStatus(task.status)};
+}
+
 function normalizeSupabaseData(data) {
   const out = data || {};
   const notifications = {};
@@ -31,7 +58,7 @@ function normalizeSupabaseData(data) {
   });
   return {
     members: out.members || [],
-    tasks: out.tasks || [],
+    tasks: (out.tasks || []).map(normalizeTaskForUi),
     notifications,
     announcements: out.announcements || [],
     taskCounter: Number(out.task_counter || 1001),
@@ -70,7 +97,8 @@ async function supabaseCall(action, payload = {}) {
         p_employee_id: payload.employeeId || '',
         p_session_token: payload.sessionToken || getSessionToken(),
         p_task_id: payload.taskId || '',
-        p_status: payload.status || 'Pending'
+        // Supabase task_status enum uses `in-progress`, not `In Progress`.
+        p_status: statusForDatabase(payload.status || 'Pending')
       };
       break;
 
@@ -447,7 +475,7 @@ async function loadDirectAnnouncements(){
     }));
   }catch(e){console.warn('Direct announcement refresh failed:',e)}
 }
-async function loadLive(silent=true){if(!APP.currentUser||isLoading)return;isLoading=true;try{const data=await direct('getLiveUpdates',{employeeId:APP.currentUser.employeeId});APP.tasks=data.tasks||[];APP.notifications=data.notifications||{};APP.announcements=data.announcements||APP.announcements;await loadDirectNotifications();await loadDirectAnnouncements();renderTasks();renderNotifications();renderAnnouncements();if(!silent)toast('Updated')}catch(e){console.warn('Live update failed:',e);await loadDirectNotifications();await loadDirectAnnouncements();renderNotifications();renderAnnouncements()}finally{isLoading=false}}
+async function loadLive(silent=true){if(!APP.currentUser||isLoading)return;isLoading=true;try{const data=await direct('getLiveUpdates',{employeeId:APP.currentUser.employeeId});APP.tasks=(data.tasks||[]).map(normalizeTaskForUi);APP.notifications=data.notifications||{};APP.announcements=data.announcements||APP.announcements;await loadDirectNotifications();await loadDirectAnnouncements();renderDashboardStats();renderTasks();renderMembers();renderNotifications();renderAnnouncements();if(!silent)toast('Updated')}catch(e){console.warn('Live update failed:',e);await loadDirectNotifications();await loadDirectAnnouncements();renderDashboardStats();renderTasks();renderNotifications();renderAnnouncements()}finally{isLoading=false}}
 function startLiveRefresh(){stopLiveRefresh();liveRefreshTimer=setInterval(()=>{if(document.visibilityState==='visible'){renderGreeting();loadLive(true)}},3000)}
 function stopLiveRefresh(){if(liveRefreshTimer)clearInterval(liveRefreshTimer);liveRefreshTimer=null}
 function renderAll(){populateAssignees();renderDashboardStats();renderGreeting();renderTasks();renderMembers();renderTeamList();renderNotifications();renderAnnouncements();renderReportSummary()}
@@ -461,17 +489,38 @@ function renderTasks(){
   let tasks=[...(APP.tasks||[])];const me=APP.currentUser?.name;
   if(!isOwner())tasks=tasks.filter(t=>taskAssignedToMe(t,me));
   else if(APP.filter==='my')tasks=tasks.filter(t=>taskAssignedToMe(t,me));
-  if(APP.filter==='in-progress')tasks=tasks.filter(t=>String(t.status).toLowerCase()==='in progress');
-  if(APP.filter==='pending')tasks=tasks.filter(t=>String(t.status).toLowerCase()==='pending');
-  if(APP.filter==='open')tasks=tasks.filter(t=>String(t.status).toLowerCase()!=='completed');
-  if(APP.filter==='completed')tasks=tasks.filter(t=>String(t.status).toLowerCase()==='completed');
+  if(APP.filter==='in-progress')tasks=tasks.filter(t=>normalizeTaskStatus(t.status)==='In Progress');
+  if(APP.filter==='pending')tasks=tasks.filter(t=>normalizeTaskStatus(t.status)==='Pending');
+  if(APP.filter==='open')tasks=tasks.filter(t=>normalizeTaskStatus(t.status)!=='Completed');
+  if(APP.filter==='completed')tasks=tasks.filter(t=>normalizeTaskStatus(t.status)==='Completed');
   const body=document.getElementById('dashboardTaskTable'),mobile=document.getElementById('mobileTaskList');
   if(!tasks.length){body.innerHTML='<tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:30px">No tasks found.</td></tr>';mobile.innerHTML='<div style="text-align:center;color:var(--text-muted);padding:25px">No tasks found.</div>';return}
-  body.innerHTML=tasks.map(t=>{const overdue=t.deadline&&new Date(t.deadline+'T23:59:59')<new Date()&&String(t.status).toLowerCase()!=='completed';const p=String(t.priority||'Medium').toLowerCase();const status=t.status||'Pending';return `<tr class="task-row" onclick="openTaskDetails('${escapeHtml(t.id)}')"><td><b>${escapeHtml(t.id)}</b></td><td>${escapeHtml(t.taskType)}<div style="font-size:10px;color:var(--text-muted);margin-top:3px">${escapeHtml(t.taskDepartment||t.department||'Other')}</div></td><td>${escapeHtml(taskAssignedToText(t))}</td><td><span class="badge badge-${p}">${escapeHtml(t.priority)}</span></td><td>${escapeHtml(t.deadline||'—')}${overdue?' <span class="status-overdue">OVERDUE</span>':''}</td><td onclick="event.stopPropagation()"><select onchange="changeTaskStatus('${escapeHtml(t.id)}',this.value)" style="padding:5px;border:1px solid var(--border);border-radius:6px"><option ${status==='Pending'?'selected':''}>Pending</option><option ${status==='In Progress'?'selected':''}>In Progress</option><option ${status==='Completed'?'selected':''}>Completed</option></select></td><td>${escapeHtml(t.completedAt||'—')}</td><td onclick="event.stopPropagation()">${t.fileUrl?`<a class="btn-sm btn-success" href="${escapeHtml(t.fileUrl)}" target="_blank"><i class="fas fa-paperclip"></i></a>`:''}${isOwner()?`<button class="btn-sm btn-edit" onclick="editTask('${escapeHtml(t.id)}')"><i class="fas fa-pen"></i></button><button class="btn-sm btn-delete" onclick="deleteTask('${escapeHtml(t.id)}')"><i class="fas fa-trash"></i></button>`:''}</td></tr>`}).join('');
-  mobile.innerHTML=tasks.map(t=>{const overdue=t.deadline&&new Date(t.deadline+'T23:59:59')<new Date()&&String(t.status).toLowerCase()!=='completed';const status=t.status||'Pending';return `<div class="mobile-task-card" onclick="openTaskDetails('${escapeHtml(t.id)}')"><div class="mobile-task-top"><div><div class="mobile-task-title">${escapeHtml(t.taskType)}</div><div class="mobile-task-id">${escapeHtml(t.id)} • ${escapeHtml(taskAssignedToText(t))} • ${escapeHtml(t.taskDepartment||t.department||'Other')}</div></div><span class="badge badge-${String(t.priority||'Medium').toLowerCase()}">${escapeHtml(t.priority)}</span></div><div class="mobile-task-meta"><div><span>Deadline</span><b>${escapeHtml(t.deadline||'—')}</b>${overdue?' <span class="status-overdue">OVERDUE</span>':''}</div><div><span>Assigned By</span><b>${escapeHtml(t.createdByName||'—')}</b></div></div><div class="mobile-task-bottom" onclick="event.stopPropagation()"><select onchange="changeTaskStatus('${escapeHtml(t.id)}',this.value)"><option ${status==='Pending'?'selected':''}>Pending</option><option ${status==='In Progress'?'selected':''}>In Progress</option><option ${status==='Completed'?'selected':''}>Completed</option></select><button onclick="openTaskDetails('${escapeHtml(t.id)}')"><i class="fas fa-eye"></i></button></div></div>`}).join('');
+  body.innerHTML=tasks.map(t=>{const overdue=t.deadline&&new Date(t.deadline+'T23:59:59')<new Date()&&String(t.status).toLowerCase()!=='completed';const p=String(t.priority||'Medium').toLowerCase();const status=normalizeTaskStatus(t.status);return `<tr class="task-row" onclick="openTaskDetails('${escapeHtml(t.id)}')"><td><b>${escapeHtml(t.id)}</b></td><td>${escapeHtml(t.taskType)}<div style="font-size:10px;color:var(--text-muted);margin-top:3px">${escapeHtml(t.taskDepartment||t.department||'Other')}</div></td><td>${escapeHtml(taskAssignedToText(t))}</td><td><span class="badge badge-${p}">${escapeHtml(t.priority)}</span></td><td>${escapeHtml(t.deadline||'—')}${overdue?' <span class="status-overdue">OVERDUE</span>':''}</td><td onclick="event.stopPropagation()"><select onchange="changeTaskStatus('${escapeHtml(t.id)}',this.value)" style="padding:5px;border:1px solid var(--border);border-radius:6px"><option ${status==='Pending'?'selected':''}>Pending</option><option ${status==='In Progress'?'selected':''}>In Progress</option><option ${status==='Completed'?'selected':''}>Completed</option></select></td><td>${escapeHtml(t.completedAt||'—')}</td><td onclick="event.stopPropagation()">${t.fileUrl?`<a class="btn-sm btn-success" href="${escapeHtml(t.fileUrl)}" target="_blank"><i class="fas fa-paperclip"></i></a>`:''}${isOwner()?`<button class="btn-sm btn-edit" onclick="editTask('${escapeHtml(t.id)}')"><i class="fas fa-pen"></i></button><button class="btn-sm btn-delete" onclick="deleteTask('${escapeHtml(t.id)}')"><i class="fas fa-trash"></i></button>`:''}</td></tr>`}).join('');
+  mobile.innerHTML=tasks.map(t=>{const overdue=t.deadline&&new Date(t.deadline+'T23:59:59')<new Date()&&String(t.status).toLowerCase()!=='completed';const status=normalizeTaskStatus(t.status);return `<div class="mobile-task-card" onclick="openTaskDetails('${escapeHtml(t.id)}')"><div class="mobile-task-top"><div><div class="mobile-task-title">${escapeHtml(t.taskType)}</div><div class="mobile-task-id">${escapeHtml(t.id)} • ${escapeHtml(taskAssignedToText(t))} • ${escapeHtml(t.taskDepartment||t.department||'Other')}</div></div><span class="badge badge-${String(t.priority||'Medium').toLowerCase()}">${escapeHtml(t.priority)}</span></div><div class="mobile-task-meta"><div><span>Deadline</span><b>${escapeHtml(t.deadline||'—')}</b>${overdue?' <span class="status-overdue">OVERDUE</span>':''}</div><div><span>Assigned By</span><b>${escapeHtml(t.createdByName||'—')}</b></div></div><div class="mobile-task-bottom" onclick="event.stopPropagation()"><select onchange="changeTaskStatus('${escapeHtml(t.id)}',this.value)"><option ${status==='Pending'?'selected':''}>Pending</option><option ${status==='In Progress'?'selected':''}>In Progress</option><option ${status==='Completed'?'selected':''}>Completed</option></select><button onclick="openTaskDetails('${escapeHtml(t.id)}')"><i class="fas fa-eye"></i></button></div></div>`}).join('');
   renderDashboardStats();
 }
-async function changeTaskStatus(id,status){const t=APP.tasks.find(x=>x.id===id);if(!t)return;const old={status:t.status,completedAt:t.completedAt};t.status=status;t.completedAt=status==='Completed'?new Date().toISOString():'';renderTasks();try{await api('updateTaskStatus',{employeeId:APP.currentUser.employeeId,taskId:id,status});toast('Task status updated');await loadLive(true)}catch(e){t.status=old.status;t.completedAt=old.completedAt;renderTasks();toast(e.message||String(e))}}
+async function changeTaskStatus(id,status){
+  const t=APP.tasks.find(x=>String(x.id)===String(id));
+  if(!t)return;
+  const next=normalizeTaskStatus(status);
+  const old={status:t.status,completedAt:t.completedAt};
+  t.status=next;
+  t.completedAt=next==='Completed'?new Date().toISOString():'';
+  renderDashboardStats();
+  renderTasks();
+  try{
+    await api('updateTaskStatus',{employeeId:APP.currentUser.employeeId,taskId:id,status:next});
+    toast('Task status updated');
+    // Reload the authoritative DB value so table, filters and KPI all stay in sync.
+    await loadLive(true);
+  }catch(e){
+    t.status=old.status;
+    t.completedAt=old.completedAt;
+    renderDashboardStats();
+    renderTasks();
+    toast(e.message||String(e));
+  }
+}
 function openTaskDetails(id){const t=APP.tasks.find(x=>x.id===id);if(!t)return;document.getElementById('detailTaskId').textContent=t.id||'TASK';document.getElementById('detailTaskTitle').textContent=t.taskType||'Task Details';document.getElementById('detailAssignedTo').textContent=taskAssignedToText(t)||'—';document.getElementById('detailAssignedBy').textContent=t.createdByName||t.createdBy||'—';document.getElementById('detailFollowUp').textContent=t.followUpTo||'—';document.getElementById('detailDepartment').textContent=t.taskDepartment||t.department||'—';document.getElementById('detailPriority').textContent=t.priority||'—';document.getElementById('detailDeadline').textContent=t.deadline||'—';document.getElementById('detailStatus').textContent=t.status||'—';document.getElementById('detailCreated').textContent=t.createdAt?new Date(t.createdAt).toLocaleString():'—';document.getElementById('detailReminder').textContent=t.reminder||'—';document.getElementById('detailCompleted').textContent=t.completedAt?new Date(t.completedAt).toLocaleString():'—';document.getElementById('detailDescription').innerHTML=safeRich(t.description)||'<span style="color:var(--text-muted)">No description provided.</span>';const a=document.getElementById('detailFile');a.style.display=t.fileUrl?'inline-block':'none';if(t.fileUrl)a.href=t.fileUrl;document.getElementById('taskDetailsModal').classList.add('show')}
 function closeTaskDetails(){document.getElementById('taskDetailsModal').classList.remove('show')}
 function editTask(id){if(!isOwner())return;const t=APP.tasks.find(x=>x.id===id);if(!t)return;document.getElementById('editTaskId').value=t.id;document.getElementById('fullTaskDepartment').value=t.taskDepartment||t.department||'';document.getElementById('fullTaskType').value=t.taskType;setSelectedAssignees(t.assignedTo);document.getElementById('fullPriority').value=t.priority;document.getElementById('fullDeadline').value=t.deadline||'';document.getElementById('fullReminder').value=t.reminder||'';document.getElementById('fullFollowUp').value=t.followUpTo||'';document.getElementById('fullDescription').innerHTML=t.description||'';document.getElementById('taskFormTitle').innerHTML='<i class="fas fa-pen"></i> Edit Task';document.getElementById('saveTaskBtn').innerHTML='<i class="fas fa-save"></i> Update Task';showPage('assign-task-page');document.getElementById('currentPageTitle').textContent='Edit Task'}
@@ -493,7 +542,7 @@ function taskAssignedToMe(t,name){ return taskAssignees(t).some(x=>String(x).tri
 async function submitFullTask(e){e.preventDefault();const id=document.getElementById('editTaskId').value;const payload={employeeId:APP.currentUser.employeeId,taskDepartment:document.getElementById('fullTaskDepartment').value,taskType:document.getElementById('fullTaskType').value,assignedTo:getSelectedAssignees().join(', '),followUpTo:document.getElementById('fullFollowUp').value,priority:document.getElementById('fullPriority').value,deadline:document.getElementById('fullDeadline').value,reminder:document.getElementById('fullReminder').value,description:document.getElementById('fullDescription').innerHTML};if(!payload.taskDepartment){toast('Please select a department.');return}if(!payload.assignedTo){toast('Please select at least one team member.');return}const f=document.getElementById('fullTaskFile').files[0];try{if(f)payload.fileUrl=await uploadFile(f,'uploadTaskFile');if(id&&isOwner()){const t=APP.tasks.find(x=>x.id===id);Object.assign(t,payload,{id:id,createdBy:t.createdBy,createdByName:t.createdByName,department:payload.taskDepartment,taskDepartment:payload.taskDepartment,updatedAt:new Date().toISOString()});await persist();toast('Task updated')}else{await api('createTask',payload);toast(taskAssignees({assignedTo:payload.assignedTo}).includes(APP.currentUser.name)?'Task created':'Task assigned successfully')}resetTaskForm();await loadData(true);showPage('dashboard-page');document.getElementById('currentPageTitle').textContent=isOwner()?'Dashboard':'My Tasks'}catch(err){toast(err.message||String(err))}}
 async function createQuickTask(){const title=document.getElementById('quickTitle').value.trim(),assignee=document.getElementById('quickAssignee').value,due=document.getElementById('quickDueDate').value,department=document.getElementById('quickDepartment').value;if(!title||!assignee||!due||!department){toast('Enter title, department, member and due date');return}try{await api('createTask',{employeeId:APP.currentUser.employeeId,taskType:title,taskDepartment:department,assignedTo:assignee,priority:document.getElementById('quickPriority').value,deadline:due,reminder:'',description:'',fileUrl:''});document.getElementById('quickTitle').value='';document.getElementById('quickDepartment').value='';await loadData(true);toast('Task added')}catch(e){toast(e.message||String(e))}}
 function resetTaskForm(){document.getElementById('editTaskId').value='';document.getElementById('fullTaskDepartment').value='';document.getElementById('fullTaskType').value='';Array.from(document.getElementById('fullAssignee').options).forEach(o=>o.selected=false);renderAssigneePicker();closeAssigneePicker();document.getElementById('fullFollowUp').value='';document.getElementById('fullPriority').value='Medium';document.getElementById('fullDeadline').value='';document.getElementById('fullReminder').value='';document.getElementById('fullDescription').innerHTML='';document.getElementById('fullTaskFile').value='';document.getElementById('taskFormTitle').innerHTML='<i class="fas fa-tasks"></i> Assign New Task';document.getElementById('saveTaskBtn').innerHTML='<i class="fas fa-paper-plane"></i> Assign Task'}
-function renderDashboardStats(){const all=APP.tasks||[];const open=all.filter(t=>String(t.status||'Pending').toLowerCase()!=='completed').length;const pending=all.filter(t=>String(t.status||'Pending').toLowerCase()==='pending').length;const progress=all.filter(t=>String(t.status||'').toLowerCase()==='in progress').length;const completed=all.filter(t=>String(t.status||'').toLowerCase()==='completed').length;[['countOpen',open],['countPending',pending],['countProgress',progress],['countCompleted',completed]].forEach(([id,n])=>{const el=document.getElementById(id);if(el)el.textContent=n})}
+function renderDashboardStats(){const all=APP.tasks||[];const open=all.filter(t=>normalizeTaskStatus(t.status)!=='Completed').length;const pending=all.filter(t=>normalizeTaskStatus(t.status)==='Pending').length;const progress=all.filter(t=>normalizeTaskStatus(t.status)==='In Progress').length;const completed=all.filter(t=>normalizeTaskStatus(t.status)==='Completed').length;[['countOpen',open],['countPending',pending],['countProgress',progress],['countCompleted',completed]].forEach(([id,n])=>{const el=document.getElementById(id);if(el)el.textContent=n})}
 function renderGreeting(){const m=APP.currentUser;if(!m)return;const h=new Date().getHours();const greeting=h<12?'Good Morning':h<17?'Good Afternoon':'Good Evening';const el=document.getElementById('greetingText');const sub=document.getElementById('greetingSubtext');const dept=document.getElementById('dashboardDepartment');if(el)el.textContent=greeting+', '+m.name+' 👋';if(sub)sub.textContent=isOwner(m)?'Here is your team task overview for today.':'Here is your personal task overview for today.';if(dept)dept.textContent='Department: '+(m.department||'Other')}
 function openCountDetails(type){let filter='my';let title='My Tasks';if(type==='completed'){filter='completed';title='Completed'}else if(type==='in-progress'){filter='in-progress';title='In Progress'}else if(type==='pending'){filter='pending';title='Pending'}else if(type==='open'){filter='open';title='Open Tasks'}APP.filter=filter;document.getElementById('currentPageTitle').textContent=title;document.getElementById('taskTableHeading').textContent=title;showPage('dashboard-page');renderTasks()}
 
