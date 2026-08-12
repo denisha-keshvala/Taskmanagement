@@ -229,6 +229,64 @@ async function supabaseCall(action, payload = {}) {
       throw new Error('Unknown Supabase action: ' + action);
   }
 
+  // IMPORTANT: status changes are written directly to public.tasks.
+  // The old implementation depended on an RPC named update_task_status;
+  // when that RPC was missing/out-of-sync, the dropdown changed locally
+  // but the database never changed. Direct update keeps the UI and DB in
+  // one path and still enforces that non-admin users can update only tasks
+  // assigned to them.
+  if (action === 'updateTaskStatus') {
+    const taskId = String(payload.taskId || '').trim();
+    const dbStatus = statusForDatabase(payload.status || 'Pending');
+    const employeeLogin = String(payload.employeeId || APP.currentUser?.employeeId || '').trim();
+    if (!taskId) throw new Error('Task ID is required.');
+    if (!employeeLogin) throw new Error('Employee session is missing.');
+
+    let actorId = APP.currentUser?.id || APP.currentUser?.employee_id || '';
+    if (!actorId) {
+      const ar = await supabaseClient.from('employees').select('id,name,role').eq('login_id', employeeLogin).maybeSingle();
+      if (ar.error) throw sbError(ar.error);
+      actorId = ar.data?.id || '';
+      if (ar.data && !APP.currentUser) APP.currentUser = {...ar.data, employeeId: employeeLogin};
+    }
+    if (!actorId) throw new Error('Employee not found.');
+
+    let tr = await supabaseClient.from('tasks').select('id,task_id,status,completed_at').eq('task_id', taskId).maybeSingle();
+    if (tr.error) throw sbError(tr.error);
+    if (!tr.data) {
+      // Some older task payloads expose the UUID as `id` instead of task_id.
+      tr = await supabaseClient.from('tasks').select('id,task_id,status,completed_at').eq('id', taskId).maybeSingle();
+      if (tr.error) throw sbError(tr.error);
+    }
+    if (!tr.data) throw new Error('Task not found.');
+
+    const actorRole = String(APP.currentUser?.role || '').toLowerCase();
+    const admin = actorRole === 'owner' || actorRole === 'admin';
+    if (!admin) {
+      const ass = await supabaseClient.from('task_assignees').select('id').eq('task_id', tr.data.id).eq('employee_id', actorId).maybeSingle();
+      if (ass.error) throw sbError(ass.error);
+      if (!ass.data) throw new Error('You can update only your assigned tasks.');
+    }
+
+    const ur = await supabaseClient.from('tasks')
+      .update({status: dbStatus})
+      .eq('id', tr.data.id)
+      .select('id,task_id,status,completed_at,updated_at')
+      .single();
+    if (ur.error) throw sbError(ur.error);
+
+    // Keep task history if the table exists; history failure must not undo a successful status update.
+    if (String(tr.data.status || '') !== dbStatus) {
+      try {
+        await supabaseClient.from('task_activity').insert({
+          task_id: tr.data.id, employee_id: actorId, action: 'status_update',
+          old_status: String(tr.data.status || ''), new_status: dbStatus
+        });
+      } catch (_) {}
+    }
+    return {ok:true, task:ur.data};
+  }
+
   const { data, error } = await supabaseClient.rpc(rpcName, params);
   if (error) throw sbError(error);
 
