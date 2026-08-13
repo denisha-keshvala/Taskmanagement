@@ -76,9 +76,9 @@ async function supabaseCall(action, payload = {}) {
     case 'login':
       rpcName = 'login_employee';
       params = {
-        p_login_id: payload.employeeId || '',
-        p_password: payload.password || '',
-        p_department: payload.department || ''
+        p_login_id: String(payload.employeeId || '').trim(),
+        p_password: String(payload.password || ''),
+        p_department: String(payload.department || '').trim()
       };
       break;
 
@@ -288,7 +288,27 @@ async function supabaseCall(action, payload = {}) {
     return {ok:true, task:ur.data};
   }
 
-  const { data, error } = await supabaseClient.rpc(rpcName, params);
+  // Login is kept backward-compatible with both database versions:
+  // current schema: login_employee(p_department, p_login_id, p_password)
+  // older schema:  login_employee(p_login_id, p_password)
+  let data, error;
+  if (action === 'login') {
+    const first = await supabaseClient.rpc('login_employee', params);
+    data = first.data; error = first.error;
+    if (error) {
+      const msg = String(error.message || error.details || '').toLowerCase();
+      if (msg.includes('function') && msg.includes('login_employee')) {
+        const fallback = await supabaseClient.rpc('login_employee', {
+          p_login_id: params.p_login_id,
+          p_password: params.p_password
+        });
+        data = fallback.data; error = fallback.error;
+      }
+    }
+  } else {
+    const r = await supabaseClient.rpc(rpcName, params);
+    data = r.data; error = r.error;
+  }
   if (error) throw sbError(error);
 
   if (action === 'getData' || action === 'getLiveUpdates') {
@@ -459,35 +479,81 @@ async function init(){
   }
 }
 async function login(){
-  const employeeId=document.getElementById('loginEmployeeId').value.trim(),
-        password=document.getElementById('loginPassword').value,
-        department=document.getElementById('loginDepartmentSelect').value;
+  const idEl=document.getElementById('loginEmployeeId');
+  const passEl=document.getElementById('loginPassword');
+  const depEl=document.getElementById('loginDepartmentSelect');
+  const employeeId=String(idEl?.value||'').trim();
+  const password=String(passEl?.value||'');
+  const department=String(depEl?.value||'').trim();
+  const btn=document.querySelector('#loginScreen .btn-primary');
   if(!employeeId||!password||!department){
     showLoginError('Please enter Employee ID, password and select department.');
     return;
   }
-  const btn=document.querySelector('#loginScreen .btn-primary');
-  if(btn)btn.disabled=true;
-  try{
-    const result=await direct('login',{employeeId,password,department});
-    if(!result?.ok){
-      showLoginError(result?.message||'Invalid login.');
-      return;
-    }
-    APP.sessionToken=result.sessionToken||'';
-    if(APP.sessionToken)localStorage.setItem('taskCommandSession',APP.sessionToken);
-    const fresh=await direct('getData',{
-      employeeId:result.member.employeeId,
-      sessionToken:APP.sessionToken
-    });
-    APP={...APP,...fresh,sessionToken:APP.sessionToken};
-    startSession(fresh.currentUser||result.member);
-    document.getElementById('loginPassword').value='';
-  }catch(e){
-    showLoginError(e.message||String(e));
-  }finally{
-    if(btn)btn.disabled=false;
+  if(!window.supabaseClient || typeof window.supabaseClient.rpc!=='function'){
+    showLoginError('Supabase client is not initialized. Check supabase-config.js.');
+    return;
   }
+  if(btn){btn.disabled=true;btn.dataset.loginText=btn.innerHTML;btn.innerHTML='Logging in...';}
+  const finish=()=>{if(btn){btn.disabled=false;btn.innerHTML=btn.dataset.loginText||'LOGIN';}};
+  try{
+    // Try the current 3-parameter RPC first, then the legacy 2-parameter RPC.
+    let r=await window.supabaseClient.rpc('login_employee',{
+      p_login_id:employeeId,
+      p_password:password,
+      p_department:department
+    });
+    if(r.error){
+      const msg=String(r.error.message||'').toLowerCase();
+      if(msg.includes('function') && msg.includes('login_employee')){
+        r=await window.supabaseClient.rpc('login_employee',{
+          p_login_id:employeeId,
+          p_password:password
+        });
+      }
+    }
+    if(r.error) throw r.error;
+    let response=Array.isArray(r.data)?r.data[0]:r.data;
+    if(!response || response.ok===false){
+      throw new Error(response?.message||'Invalid login ID, password or department.');
+    }
+    const member=response.member||response.current_user||response.user||response;
+    if(!member || !(member.id||member.uuid||member.employee_id||member.employeeId||member.login_id)){
+      throw new Error('Login succeeded but employee data was not returned.');
+    }
+    const normalized={
+      ...member,
+      id:member.id||member.uuid||member.employee_id||'',
+      employeeId:member.employeeId||member.employee_id||member.login_id||employeeId,
+      login_id:member.login_id||employeeId,
+      name:member.name||employeeId,
+      role:member.role||'employee',
+      department:member.department||department,
+      email:member.email||'',
+      phone:member.phone||'',
+      photo:member.photo||member.profile_photo_url||'',
+      is_active:member.is_active!==false
+    };
+    APP.currentUser=normalized;
+    APP.sessionToken=response.sessionToken||response.session_token||response.token||'';
+    localStorage.setItem('taskCommandUserId',normalized.employeeId);
+    if(APP.sessionToken) localStorage.setItem('taskCommandSession',APP.sessionToken);
+    // Load real app data. If get_app_data is temporarily unavailable, still open the dashboard
+    // with the authenticated member rather than leaving the user stuck on login.
+    try{
+      const fresh=await direct('getData',{employeeId:normalized.employeeId,sessionToken:APP.sessionToken});
+      APP={...APP,...fresh,currentUser:fresh.currentUser||normalized,sessionToken:APP.sessionToken};
+    }catch(dataErr){
+      console.warn('get_app_data after login failed:',dataErr);
+      APP.currentUser=normalized;
+    }
+    startSession(APP.currentUser||normalized);
+    if(passEl) passEl.value='';
+    showLoginError('');
+  }catch(e){
+    console.error('LOGIN:',e);
+    showLoginError(e?.message||'Login failed. Check ID, password and department.');
+  }finally{finish();}
 }
 // Login button compatibility: index.html calls handleLogin().
 // Keep the existing login() implementation and expose it safely.
