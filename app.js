@@ -931,7 +931,6 @@ function _xlsxXml(rows){
 function _makeXlsx(rows,f){window.__tcReportEmployee=f.employee;window.__tcReportPeriod=f.period;const x=_xlsxXml(rows);return _zip([{name:'[Content_Types].xml',data:x.contentTypes},{name:'_rels/.rels',data:x.rels},{name:'xl/workbook.xml',data:x.workbook},{name:'xl/_rels/workbook.xml.rels',data:x.workbookrels},{name:'xl/styles.xml',data:x.styles},{name:'xl/worksheets/sheet1.xml',data:x.sheet}]);}
 
 /* Colorful PDF report — intentionally matches the dashboard/report look without external libraries. */
-function _pdfEscape(v){return String(v==null?'':v).replace(/[•·]/g,' | ').replace(/[–—]/g,'-').replace(/[“”]/g,'\"').replace(/[‘’]/g,"'").replace(/[^\x20-\x7E]/g,' ').replace(/\\/g,'\\\\').replace(/\(/g,'\\(').replace(/\)/g,'\\)');}
 function _makePdf(rows,f){
   const W=842,H=595,objs=[];function add(s){objs.push(s);return objs.length;}
   const font=add('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>');
@@ -964,7 +963,7 @@ function _makePdf(rows,f){
     c+=line(x0,tableY,x0,tableY+headerH+pageRows.length*rowH,[215,224,239],.7);c+=line(x0+contentW,tableY,x0+contentW,tableY+headerH+pageRows.length*rowH,[215,224,239],.7);
     const footY=tableY+headerH+pageRows.length*rowH+34;c+=text(W/2,footY,9,'TASK COMMAND  •  Centralized Team Management  •  '+total+' task(s) in this report',[100,116,139],true,'center');
     if(pageBody.length>1)c+=text(W-32,H-18,8,'Page '+(pageIndex+1)+' of '+pageBody.length,[100,116,139],false,'right');
-    const streamBytes=new TextEncoder().encode(c);const stream=add('<< /Length '+streamBytes.length+' >>\nstream\n'+c+'\nendstream');
+    const stream=add('<< /Length '+c.length+' >>\nstream\n'+c+'\nendstream');
     const page=add('<< /Type /Page /Parent 0 0 R /MediaBox [0 0 '+W+' '+H+'] /Resources << /Font << /F1 '+font+' 0 R /F2 '+bold+' 0 R >> >> /Contents '+stream+' 0 R >>');pages.push(page);
   });
   const kids=pages.map(n=>n+' 0 R').join(' '), pagesObj=add('<< /Type /Pages /Kids ['+kids+'] /Count '+pages.length+' >>');for(const n of pages)objs[n-1]=objs[n-1].replace('/Parent 0 0 R','/Parent '+pagesObj+' 0 R');const catalog=add('<< /Type /Catalog /Pages '+pagesObj+' 0 R >>');
