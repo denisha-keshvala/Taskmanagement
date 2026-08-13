@@ -715,122 +715,9 @@ function openAnnouncementDetails(i){const a=(APP.announcements||[])[i];if(!a)ret
 function closeAnnouncementDetails(){document.getElementById('announcementDetailsModal')?.classList.remove('show')}
 
 async function downloadTaskReport(kind){
-  if(!APP.currentUser)return;
-  const buttons=document.querySelectorAll('.report-btn');
-  buttons.forEach(b=>b.disabled=true);
-  try{
-    const employee=isOwner()?((document.getElementById('reportEmployee')||{}).value||'ALL'):APP.currentUser.name;
-    const period=(document.getElementById('reportPeriod')||{}).value||'all';
-    const r=await api('getTaskReport',{employeeId:APP.currentUser.employeeId,employee,period});
-    const tasks=r.tasks||[];
-    const rows=tasks.map(t=>({
-      'Task ID':t.id||'',
-      'Task Type':t.taskType||'',
-      'Department':t.department||t.taskDepartment||'Other',
-      'Assigned To':taskAssignedToText(t),
-      'Assigned By':t.createdByName||'',
-      'Follow-up':t.followUpTo||'',
-      'Priority':t.priority||'Medium',
-      'Deadline':t.deadline||'',
-      'Status':t.status||'Pending',
-      'Created At':t.createdAt||'',
-      'Completed At':t.completedAt||''
-    }));
-    const stamp=new Date().toISOString().replace(/[:.]/g,'-').slice(0,19);
-    const base='TASK_COMMAND_'+String(employee||'ALL').replace(/[^a-z0-9]+/gi,'_')+'_'+period+'_'+stamp;
-
-    if(kind==='csv'){
-      const headers=Object.keys(rows[0]||{
-        'Task ID':'','Task Type':'','Department':'','Assigned To':'','Assigned By':'',
-        'Follow-up':'','Priority':'','Deadline':'','Status':'','Created At':'','Completed At':''
-      });
-      const csv=[headers.join(','),...rows.map(row=>headers.map(h=>{
-        const v=String(row[h]??'').replace(/"/g,'""');
-        return '"'+v+'"';
-      }).join(','))].join('\r\n');
-      const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
-      const url=URL.createObjectURL(blob);
-      const a=document.createElement('a');a.href=url;a.download=base+'.csv';a.click();
-      setTimeout(()=>URL.revokeObjectURL(url),1000);
-      toast('CSV downloaded — '+tasks.length+' task(s)');
-      return;
-    }
-
-    if(kind==='xlsx'){
-      if(!window.XLSX)throw new Error('Excel export library is not loaded. Refresh the page and try again.');
-      const ws=XLSX.utils.json_to_sheet(rows);
-      const wb=XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb,ws,'Task Report');
-      XLSX.writeFile(wb,base+'.xlsx');
-      toast('Excel downloaded — '+tasks.length+' task(s)');
-      return;
-    }
-
-    if(kind==='pdf'){
-      if(!window.jspdf?.jsPDF)throw new Error('PDF export library is not loaded. Refresh the page and try again.');
-      const doc=new jspdf.jsPDF({orientation:'landscape',unit:'pt',format:'a4'});
-      doc.setFontSize(20);
-      doc.setTextColor(23,59,143);
-      doc.text('TASK COMMAND',doc.internal.pageSize.getWidth()/2,38,{align:'center'});
-      doc.setFontSize(11);
-      doc.setTextColor(91,55,255);
-      doc.text('TASK PERFORMANCE REPORT',doc.internal.pageSize.getWidth()/2,56,{align:'center'});
-      doc.setFontSize(9);
-      doc.setTextColor(100,116,139);
-      doc.text('Employee: '+employee+'   •   Period: '+String(period).toUpperCase()+'   •   Generated: '+new Date().toLocaleString(),doc.internal.pageSize.getWidth()/2,72,{align:'center'});
-
-      const total=tasks.length;
-      const completed=tasks.filter(t=>String(t.status).toLowerCase()==='completed').length;
-      const pending=tasks.filter(t=>String(t.status).toLowerCase()==='pending').length;
-      const progress=tasks.filter(t=>String(t.status).toLowerCase()==='in progress').length;
-
-      doc.setFontSize(10);
-      doc.setTextColor(23,32,51);
-      doc.text('Total: '+total+'    Completed: '+completed+'    Pending: '+pending+'    In Progress: '+progress,40,96);
-
-      const head=[['TASK ID','TASK TYPE','DEPARTMENT','ASSIGNED TO','ASSIGNED BY','PRIORITY','DEADLINE','STATUS']];
-      const body=tasks.map(t=>[
-        t.id||'',
-        t.taskType||'',
-        t.department||t.taskDepartment||'Other',
-        taskAssignedToText(t),
-        t.createdByName||'—',
-        t.priority||'Medium',
-        t.deadline||'—',
-        t.status||'Pending'
-      ]);
-
-      if(typeof doc.autoTable==='function'){
-        doc.autoTable({
-          head,
-          body,
-          startY:110,
-          styles:{fontSize:7,cellPadding:4},
-          headStyles:{fillColor:[23,59,143],textColor:255},
-          alternateRowStyles:{fillColor:[247,249,252]}
-        });
-      }else{
-        let y=115;
-        doc.setFontSize(7);
-        head[0].forEach((h,i)=>doc.text(h,40+i*90,y));
-        y+=14;
-        body.forEach(row=>{
-          row.forEach((v,i)=>doc.text(String(v).slice(0,18),40+i*90,y));
-          y+=12;
-          if(y>550){doc.addPage();y=40;}
-        });
-      }
-
-      doc.save(base+'.pdf');
-      toast('PDF downloaded — '+tasks.length+' task(s)');
-      return;
-    }
-
-    throw new Error('Unknown report format.');
-  }catch(e){
-    toast(e.message||String(e));
-  }finally{
-    buttons.forEach(b=>b.disabled=false);
+  // Single report entry point. The premium exporter below owns PDF/Excel generation.
+  if(typeof window.downloadTaskReport === 'function' && window.downloadTaskReport !== downloadTaskReport){
+    return window.downloadTaskReport(kind === 'xlsx' ? 'excel' : kind);
   }
 }
 
@@ -966,9 +853,9 @@ function _xlsxStyle(){
   xfs.push(xf(0,2,0,'left',false)); //0 white base
   xfs.push(xf(1,2,1,'center',false)); //1 navy header
   xfs.push(xf(2,7,1,'left',true)); //2 alternating white-ish
-  xfs.push(xf(3,2,0,'center',false)); //3 title
-  xfs.push(xf(4,2,0,'center',false)); //4 subtitle
-  xfs.push(xf(5,2,0,'center',false)); //5 meta
+  xfs.push(xf(3,0,0,'center',false)); //3 title
+  xfs.push(xf(4,0,0,'center',false)); //4 subtitle
+  xfs.push(xf(5,0,0,'center',false)); //5 meta
   xfs.push(xf(6,3,1,'center',false)); //6 total KPI
   xfs.push(xf(7,4,1,'center',false)); //7 complete KPI
   xfs.push(xf(8,5,1,'center',false)); //8 pending KPI
