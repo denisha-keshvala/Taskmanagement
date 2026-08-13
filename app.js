@@ -890,43 +890,143 @@ function _downloadBytes(bytes,name,type){const blob=new Blob([bytes],{type:type|
 function _crc32(bytes){let table=_crc32.table;if(!table){table=new Uint32Array(256);for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=(c&1)?(0xedb88320^(c>>>1)):(c>>>1);table[n]=c>>>0;} _crc32.table=table;}let c=0xffffffff;for(let i=0;i<bytes.length;i++)c=table[(c^bytes[i])&255]^(c>>>8);return (c^0xffffffff)>>>0;}
 function _u16(n){return [n&255,(n>>>8)&255];} function _u32(n){return [n&255,(n>>>8)&255,(n>>>16)&255,(n>>>24)&255];}
 function _strBytes(s){const enc=new TextEncoder();return Array.from(enc.encode(s));}
-function _zip(files){let out=[],central=[],offset=0;files.forEach(f=>{const name=_strBytes(f.name),data=_strBytes(f.data),crc=_crc32(data);const h=[0x50,0x4b,3,4,..._u16(20),..._u16(0),..._u16(0),..._u16(0),..._u16(0),..._u32(crc),..._u32(data.length),..._u32(data.length),..._u16(name.length),0, ...name];out.push(...h,...data);const c=[0x50,0x4b,1,2,20,0,20,0,..._u16(0),..._u16(0),..._u16(0),..._u16(0),..._u16(0),..._u32(crc),..._u32(data.length),..._u32(data.length),..._u16(name.length),0,0,..._u16(0),..._u16(0),..._u16(0),..._u32(0),..._u32(offset),...name];central.push(c);offset+=h.length+data.length;});const cdStart=offset;const cd=central.flat();out.push(...cd);out.push(0x50,0x4b,5,6,0,0,0,0,..._u16(files.length),..._u16(files.length),..._u32(cd.length),..._u32(cdStart),0,0);return new Uint8Array(out);}
+function _zip(files){
+  const out=[]; const central=[]; let offset=0;
+  function push(arr,bytes){for(const b of bytes)arr.push(b);}
+  files.forEach(f=>{
+    const name=_strBytes(f.name), data=_strBytes(f.data), crc=_crc32(data);
+    const local=[];
+    push(local,[0x50,0x4b,0x03,0x04]);
+    push(local,_u16(20)); // version needed
+    push(local,_u16(0));  // flags
+    push(local,_u16(0));  // stored/no compression
+    push(local,_u16(0));  // mod time
+    push(local,_u16(0));  // mod date
+    push(local,_u32(crc));
+    push(local,_u32(data.length));
+    push(local,_u32(data.length));
+    push(local,_u16(name.length));
+    push(local,_u16(0));  // extra length
+    push(local,name);
+    push(local,data);
+    push(out,local);
+
+    const centralHeader=[];
+    push(centralHeader,[0x50,0x4b,0x01,0x02]);
+    push(centralHeader,_u16(20)); // version made by
+    push(centralHeader,_u16(20)); // version needed
+    push(centralHeader,_u16(0));
+    push(centralHeader,_u16(0));
+    push(centralHeader,_u16(0));
+    push(centralHeader,_u16(0));
+    push(centralHeader,_u32(crc));
+    push(centralHeader,_u32(data.length));
+    push(centralHeader,_u32(data.length));
+    push(centralHeader,_u16(name.length));
+    push(centralHeader,_u16(0)); // extra
+    push(centralHeader,_u16(0)); // comment
+    push(centralHeader,_u16(0)); // disk
+    push(centralHeader,_u16(0)); // internal attrs
+    push(centralHeader,_u32(0)); // external attrs
+    push(centralHeader,_u32(offset));
+    push(centralHeader,name);
+    central.push(centralHeader);
+    offset+=local.length;
+  });
+  const cdStart=offset;
+  let cdLength=0;
+  central.forEach(c=>{push(out,c);cdLength+=c.length;});
+  const end=[0x50,0x4b,0x05,0x06];
+  push(end,_u16(0));push(end,_u16(0));push(end,_u16(files.length));push(end,_u16(files.length));push(end,_u32(cdLength));push(end,_u32(cdStart));push(end,_u16(0));
+  push(out,end);
+  return new Uint8Array(out);
+}
+
 function _xlsxXml(rows){
-  const headers=['Task ID','Task Type','Department','Assigned To','Assigned By','Priority','Deadline','Status','Created At','Completed At'];
-  const all=[headers,...rows];
+  const headers=['Task ID','Task Type','Department','Assigned To','Assigned By','Priority','Deadline','Status'];
   const esc=_reportEsc;
+  const total=rows.length;
+  const completed=rows.filter(r=>String(r[7]||'').toLowerCase()==='completed').length;
+  const pending=rows.filter(r=>String(r[7]||'').toLowerCase()==='pending').length;
+  const progress=rows.filter(r=>String(r[7]||'').toLowerCase()==='in progress').length;
+  const meta=window.__TC_REPORT_META||{};
+  const employee=meta.employee||'ALL';
+  const period=String(meta.period||'all').toUpperCase();
+  const generated=new Date().toLocaleString();
+
   function cell(v,style){return '<c s="'+(style||0)+'" t="inlineStr"><is><t>'+esc(v)+'</t></is></c>';}
-  const sheetRows=all.map((r,i)=>'<row r="'+(i+1)+'" ht="'+(i===0?28:24)+'">'+r.map((v,j)=>cell(v,i===0?1:2)).join('')+'</row>').join('');
+  function row(r,style,ht){return '<row r="'+r+'" ht="'+(ht||22)+'">'+style+'</row>';}
+  function cells(values,style){return values.map(v=>cell(v,style)).join('');}
+
+  let sheetRows='';
+  sheetRows+=row(1,cells(['TASK COMMAND'],3),30);
+  sheetRows+=row(2,cells(['TASK PERFORMANCE REPORT'],4),24);
+  sheetRows+=row(3,cells(['Employee: '+employee+'   |   Period: '+period+'   |   Generated: '+generated],5),22);
+  sheetRows+=row(4,cells(['TOTAL TASKS','COMPLETED','PENDING','IN PROGRESS'],1),22);
+  sheetRows+=row(5,cells([total,completed,pending,progress],6),34);
+  sheetRows+=row(6,cells(['','','',''],0),10);
+  sheetRows+=row(7,cells(headers,1),26);
+  rows.forEach((r,i)=>{
+    const vals=r.slice(0,8);
+    const style=(i%2===0)?2:7;
+    sheetRows+=row(8+i,cells(vals,style),30);
+  });
+  const footerRow=8+rows.length;
+  sheetRows+=row(footerRow,cells(['TASK COMMAND  |  Centralized Team Management  |  '+total+' task(s) in this report'],5),24);
+
   const styles='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
     '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'+
-    '<numFmts count="0"/><fonts count="3">'+
+    '<numFmts count="0"/>'+ 
+    '<fonts count="8">'+
       '<font><sz val="11"/><color rgb="FF0F172A"/><name val="Aptos"/></font>'+
-      '<font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Aptos"/></font>'+
-      '<font><b/><sz val="11"/><color rgb="FF173B8F"/><name val="Aptos"/></font>'+
-    '</fonts><fills count="4">'+
-      '<fill><patternFill patternType="none"/></fill>'+
-      '<fill><patternFill patternType="gray125"/></fill>'+
+      '<font><b/><sz val="10"/><color rgb="FFFFFFFF"/><name val="Aptos"/></font>'+
+      '<font><sz val="10"/><color rgb="FF0F172A"/><name val="Aptos"/></font>'+
+      '<font><b/><sz val="22"/><color rgb="FF173B8F"/><name val="Aptos Display"/></font>'+
+      '<font><b/><sz val="15"/><color rgb="FF633BFF"/><name val="Aptos Display"/></font>'+
+      '<font><b/><sz val="9"/><color rgb="FF64748B"/><name val="Aptos"/></font>'+
+      '<font><b/><sz val="18"/><color rgb="FF173B8F"/><name val="Aptos"/></font>'+
+      '<font><b/><sz val="10"/><color rgb="FF0F172A"/><name val="Aptos"/></font>'+
+    '</fonts>'+
+    '<fills count="8">'+
+      '<fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill>'+
       '<fill><patternFill patternType="solid"><fgColor rgb="FF173B8F"/><bgColor indexed="64"/></patternFill></fill>'+
+      '<fill><patternFill patternType="solid"><fgColor rgb="FFFFFFFF"/><bgColor indexed="64"/></patternFill></fill>'+
+      '<fill><patternFill patternType="solid"><fgColor rgb="FF633BFF"/><bgColor indexed="64"/></patternFill></fill>'+
+      '<fill><patternFill patternType="solid"><fgColor rgb="FFF8FAFC"/><bgColor indexed="64"/></patternFill></fill>'+
       '<fill><patternFill patternType="solid"><fgColor rgb="FFEAF2FF"/><bgColor indexed="64"/></patternFill></fill>'+
-    '</fills><borders count="2">'+
+      '<fill><patternFill patternType="solid"><fgColor rgb="FFF5F8FC"/><bgColor indexed="64"/></patternFill></fill>'+
+    '</fills>'+
+    '<borders count="3">'+
       '<border><left/><right/><top/><bottom/><diagonal/></border>'+
       '<border><left style="thin"><color rgb="FFD5DEEE"/></left><right style="thin"><color rgb="FFD5DEEE"/></right><top style="thin"><color rgb="FFD5DEEE"/></top><bottom style="thin"><color rgb="FFD5DEEE"/></bottom><diagonal/></border>'+
-    '</borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>'+
-    '<cellXfs count="3"><xf numFmtId="0" fontId="0" fillId="0" borderId="1" applyFill="1"/><xf numFmtId="0" fontId="1" fillId="2" borderId="1" applyFont="1" applyFill="1"/><xf numFmtId="0" fontId="2" fillId="3" borderId="1" applyFont="1" applyFill="1"/></cellXfs>'+
-    '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>';
+      '<border><left/><right/><top/><bottom style="thin"><color rgb="FFD5DEEE"/></bottom><diagonal/></border>'+
+    '</borders>'+
+    '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>'+
+    '<cellXfs count="8">'+
+      '<xf numFmtId="0" fontId="0" fillId="3" borderId="1" applyFill="1"/>'+
+      '<xf numFmtId="0" fontId="1" fillId="2" borderId="1" applyFont="1" applyFill="1"><alignment horizontal="center"/></xf>'+
+      '<xf numFmtId="0" fontId="2" fillId="3" borderId="1" applyFill="1"/>'+
+      '<xf numFmtId="0" fontId="3" fillId="3" borderId="0" applyFont="1" applyFill="1"><alignment horizontal="center"/></xf>'+
+      '<xf numFmtId="0" fontId="4" fillId="3" borderId="0" applyFont="1" applyFill="1"><alignment horizontal="center"/></xf>'+
+      '<xf numFmtId="0" fontId="5" fillId="3" borderId="0" applyFont="1" applyFill="1"><alignment horizontal="center"/></xf>'+
+      '<xf numFmtId="0" fontId="6" fillId="6" borderId="1" applyFont="1" applyFill="1"><alignment horizontal="center"/></xf>'+
+      '<xf numFmtId="0" fontId="7" fillId="7" borderId="1" applyFont="1" applyFill="1"/>'+
+    '</cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>';
+
+  const maxRow=Math.max(1,footerRow);
   const sheet='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
     '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'+
-    '<sheetPr><pageSetUpPr fitToPage="1"/></sheetPr>'+
-    '<dimension ref="A1:J'+Math.max(1,all.length)+'"/>'+
-    '<sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/><selection pane="bottomLeft" activeCell="A2" sqref="A2"/></sheetView></sheetViews>'+
-    '<sheetFormatPr defaultRowHeight="22"/>'+
-    '<cols><col min="1" max="1" width="15"/><col min="2" max="2" width="31"/><col min="3" max="3" width="18"/><col min="4" max="5" width="24"/><col min="6" max="6" width="13"/><col min="7" max="7" width="15"/><col min="8" max="8" width="16"/><col min="9" max="10" width="22"/></cols>'+
-    '<autoFilter ref="A1:J'+Math.max(1,all.length)+'"/><sheetData>'+sheetRows+'</sheetData>'+
-    '<mergeCells count="0"/></worksheet>';
+    '<sheetPr><pageSetUpPr fitToPage="1"/></sheetPr><dimension ref="A1:H'+maxRow+'"/>'+ 
+    '<sheetViews><sheetView workbookViewId="0"><pane ySplit="7" topLeftCell="A8" activePane="bottomLeft" state="frozen"/><selection pane="bottomLeft" activeCell="A8" sqref="A8"/></sheetView></sheetViews>'+
+    '<sheetFormatPr defaultRowHeight="22"/>'+ 
+    '<cols><col min="1" max="1" width="20"/><col min="2" max="2" width="32"/><col min="3" max="3" width="18"/><col min="4" max="5" width="24"/><col min="6" max="6" width="13"/><col min="7" max="7" width="15"/><col min="8" max="8" width="16"/></cols>'+
+    '<mergeCells count="4"><mergeCell ref="A1:H1"/><mergeCell ref="A2:H2"/><mergeCell ref="A3:H3"/><mergeCell ref="A6:H6"/></mergeCells>'+ 
+    '<autoFilter ref="A7:H'+(7+rows.length)+'"/><sheetData>'+sheetRows+'</sheetData></worksheet>';
   const workbook='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
     '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><bookViews><workbookView/></bookViews><sheets><sheet name="Task Report" sheetId="1" r:id="rId1"/></sheets></workbook>';
   return {contentTypes:'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>',rels:'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>',workbook:workbook,workbookrels:'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>',sheet:sheet,styles:styles};
 }
+
 function _makeXlsx(rows){const x=_xlsxXml(rows);return _zip([{name:'[Content_Types].xml',data:x.contentTypes},{name:'_rels/.rels',data:x.rels},{name:'xl/workbook.xml',data:x.workbook},{name:'xl/_rels/workbook.xml.rels',data:x.workbookrels},{name:'xl/worksheets/sheet1.xml',data:x.sheet},{name:'xl/styles.xml',data:x.styles}]);}
 
 /* Minimal real PDF writer, no external CDN/library needed. */
@@ -935,32 +1035,56 @@ function _makePdf(rows,f){
   const W=841.89,H=595.28,objs=[];
   function add(o){objs.push(o);return objs.length;}
   function esc(v){return _pdfEscape(String(v??''));}
-  function rgb(r,g,b){return (r/255).toFixed(3)+' '+(g/255).toFixed(3)+' '+(b/255).toFixed(3);}
   const font=add('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>');
   const bold=add('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>');
   const pageRefs=[];
-  const cols=[52,160,270,375,480,575,675,765,810];
+  const left=42, right=799;
+  const colX=[42,128,242,344,443,542,625,715,799];
+  const colW=[86,114,102,99,99,83,90,84];
   const headers=['TASK ID','TASK TYPE','DEPARTMENT','ASSIGNED TO','ASSIGNED BY','PRIORITY','DEADLINE','STATUS'];
-  function wrap(v,max){const s=String(v??'');if(s.length<=max)return [s];const out=[];for(let i=0;i<s.length;i+=max)out.push(s.slice(i,i+max));return out;}
-  const data=rows.map(r=>[r[0],r[1],r[2],r[3],r[4]||'—',r[5],r[6]||'—',r[7]]);
-  const perPage=7; const pageCount=Math.max(1,Math.ceil(data.length/perPage));
+  const total=rows.length;
+  const completed=rows.filter(r=>String(r[7]||'').toLowerCase()==='completed').length;
+  const pending=rows.filter(r=>String(r[7]||'').toLowerCase()==='pending').length;
+  const progress=rows.filter(r=>String(r[7]||'').toLowerCase()==='in progress').length;
+  function wrap(v,max){const s=String(v??'');if(!s)return [''];const out=[];let cur='';s.split(/\s+/).forEach(word=>{if((cur+' '+word).trim().length>max&&cur){out.push(cur);cur=word}else cur=(cur+' '+word).trim()});if(cur)out.push(cur);return out.slice(0,3);}
+  const perPage=6,pageCount=Math.max(1,Math.ceil(rows.length/perPage));
   for(let pg=0;pg<pageCount;pg++){
-    const slice=data.slice(pg*perPage,(pg+1)*perPage);
+    const slice=rows.slice(pg*perPage,(pg+1)*perPage);
     let c='q 1 1 1 0 0 cm ';
-    c+='0.055 0.145 0.353 rg 0 0 '+W+' '+H+' re f ';
-    c+='1 1 1 rg BT /F2 24 Tf 42 548 Td (TASK COMMAND) Tj ET ';
-    c+='0.42 0.55 0.90 rg BT /F2 11 Tf 42 529 Td (TASK PERFORMANCE REPORT) Tj ET ';
-    c+='0.90 0.94 1 rg 42 495 757 24 re f ';
-    c+='0.20 0.27 0.40 rg BT /F2 9 Tf 50 503 Td ('+esc('Employee: '+f.employee+'   |   Period: '+String(f.period).toUpperCase()+'   |   Generated: '+new Date().toLocaleString())+') Tj ET ';
-    const counts={total:data.length,pending:data.filter(r=>r[7]==='Pending').length,progress:data.filter(r=>r[7]==='In Progress').length,completed:data.filter(r=>r[7]==='Completed').length};
-    const cards=[['TOTAL TASKS',counts.total,'0.90 0.95 1'],['COMPLETED',counts.completed,'0.90 0.98 0.94'],['PENDING',counts.pending,'1 0.97 0.89'],['IN PROGRESS',counts.progress,'0.94 0.92 1']];
-    for(let i=0;i<4;i++){const x=42+i*189.25;c+=cards[i][2]+' rg '+x+' 425 180 58 re f ';c+='0.055 0.145 0.353 rg '+x+' 471 180 12 re f ';c+='0.20 0.27 0.40 rg BT /F2 8 Tf '+(x+12)+' 458 Td ('+cards[i][0]+') Tj ET ';c+='0.055 0.145 0.353 rg BT /F2 22 Tf '+(x+12)+' 438 Td ('+String(cards[i][1])+') Tj ET ';}
-    const top=398,rowH=38;c+='0.055 0.145 0.353 rg 42 '+top+' 757 '+rowH+' re f ';
-    for(let i=0;i<headers.length;i++){c+='1 1 1 rg BT /F2 7 Tf '+(cols[i]+5)+' '+(top+14)+' Td ('+esc(headers[i])+') Tj ET ';}
+    // White premium report canvas, matching the supplied reference image.
+    c+='1 1 1 rg 0 0 '+W+' '+H+' re f ';
+    // Header
+    c+='0.090 0.231 0.561 rg BT /F2 25 Tf 421 556 Td ('+esc('TASK COMMAND')+') Tj ET ';
+    c+='0.388 0.231 1.000 rg BT /F2 13 Tf 421 533 Td ('+esc('TASK PERFORMANCE REPORT')+') Tj ET ';
+    c+='0.360 0.420 0.520 rg BT /F2 9 Tf 421 513 Td ('+esc('Employee: '+(f.employee||'ALL')+'   |   Period: '+String(f.period||'all').toUpperCase()+'   |   Generated: '+new Date().toLocaleString())+') Tj ET ';
+    // KPI header strip
+    const kx=[42,231,420,609],kw=190;
+    const cards=[['TOTAL TASKS',total,'0.902 0.949 1.000'],['COMPLETED',completed,'0.906 0.980 0.937'],['PENDING',pending,'1.000 0.969 0.886'],['IN PROGRESS',progress,'0.941 0.918 1.000']];
+    for(let i=0;i<4;i++){
+      const x=kx[i];
+      c+='0.090 0.231 0.561 rg '+x+' 466 '+kw+' 23 re f ';
+      c+='1 1 1 rg BT /F2 8 Tf '+(x+10)+' 474 Td ('+esc(cards[i][0])+') Tj ET ';
+      c+=cards[i][2]+' rg '+x+' 431 '+kw+' 35 re f ';
+      c+='0.090 0.231 0.561 rg BT /F2 19 Tf '+(x+10)+' 442 Td ('+String(cards[i][1])+') Tj ET ';
+    }
+    // Table header
+    const top=405,rowH=42;
+    c+='0.090 0.231 0.561 rg '+left+' '+top+' 757 25 re f ';
+    for(let i=0;i<headers.length;i++) c+='1 1 1 rg BT /F2 7 Tf '+(colX[i]+5)+' '+(top+9)+' Td ('+esc(headers[i])+') Tj ET ';
     let y=top-rowH;
-    slice.forEach((r,ri)=>{c+=(ri%2===0?'0.97 0.98 1':'1 1 1')+' rg 42 '+y+' 757 '+rowH+' re f ';c+='0.82 0.87 0.94 RG 0.6 w 42 '+y+' m 799 '+y+' l S ';for(let i=0;i<8;i++){let val=wrap(r[i],i===1?17:16)[0];c+='0.08 0.12 0.20 rg BT /F2 7.5 Tf '+(cols[i]+5)+' '+(y+15)+' Td ('+esc(val)+') Tj ET ';}y-=rowH;});
-    c+='0.45 0.52 0.64 rg BT /F1 8 Tf 42 26 Td ('+esc('TASK COMMAND  •  Centralized Team Management  •  '+data.length+' task(s) in this report')+') Tj ET ';
-    c+='0.45 0.52 0.64 rg BT /F1 8 Tf 735 26 Td ('+String(pg+1)+' / '+String(pageCount)+') Tj ET Q';
+    slice.forEach((r,ri)=>{
+      c+=(ri%2===0?'0.965 0.976 0.992':'1 1 1')+' rg '+left+' '+y+' 757 '+rowH+' re f ';
+      c+='0.820 0.867 0.933 RG 0.6 w '+left+' '+y+' m '+right+' '+y+' l S ';
+      for(let i=0;i<8;i++){
+        const lines=wrap(r[i],i===1?18:i===0?15:16);
+        const lineY=y+27;
+        lines.forEach((line,li)=>{c+='0.055 0.090 0.145 rg BT /F1 7.2 Tf '+(colX[i]+5)+' '+(lineY-li*9)+' Td ('+esc(line)+') Tj ET ';});
+      }
+      y-=rowH;
+    });
+    // Footer
+    c+='0.360 0.420 0.520 rg BT /F2 8 Tf 421 34 Td ('+esc('TASK COMMAND  |  Centralized Team Management  |  '+total+' task(s) in this report')+') Tj ET ';
+    c+='0.360 0.420 0.520 rg BT /F1 7 Tf 765 20 Td ('+String(pg+1)+' / '+String(pageCount)+') Tj ET Q';
     const stream=add('<< /Length '+c.length+' >>\nstream\n'+c+'\nendstream');
     const page=add('<< /Type /Page /Parent 0 0 R /MediaBox [0 0 '+W+' '+H+'] /Resources << /Font << /F1 '+font+' 0 R /F2 '+bold+' 0 R >> >> /Contents '+stream+' 0 R >>');
     pageRefs.push(page);
@@ -975,7 +1099,7 @@ function _makePdf(rows,f){
 
 async function _finalDownloadTaskReport(kind){
   if(!APP?.currentUser){try{toast('Please login first.')}catch(e){}return;}
-  const f=_reportFiltered(), rows=_rows(f);const stamp=new Date().toISOString().slice(0,19).replace(/[:T]/g,'-');const safe=String(f.employee||'ALL').replace(/[^a-z0-9]+/gi,'_');const base='TASK_COMMAND_'+safe+'_'+f.period+'_'+stamp;
+  const f=_reportFiltered(), rows=_rows(f);window.__TC_REPORT_META={employee:f.employee,period:f.period};const stamp=new Date().toISOString().slice(0,19).replace(/[:T]/g,'-');const safe=String(f.employee||'ALL').replace(/[^a-z0-9]+/gi,'_');const base='TASK_COMMAND_'+safe+'_'+f.period+'_'+stamp;
   try{
     if(kind==='csv'){try{toast('CSV is disabled. Use Excel or PDF.')}catch(e){}return;}
     if(kind==='excel'||kind==='xlsx'){
