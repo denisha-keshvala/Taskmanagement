@@ -808,7 +808,13 @@ function _rDownload(bytes,name,type){
 }
 function _rDate(){return new Date().toLocaleString(undefined,{year:'numeric',month:'short',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit'});}
 
-/* ---------- Valid XLSX writer (no CSV, no broken XML) ---------- */
+/* ---------- Excel exporter: reference table format ---------- */
+function _xlsxEsc(v){
+  return String(v==null?'':v)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;')
+    .replace(/'/g,'&apos;');
+}
 function _u16(n){return [n&255,(n>>>8)&255];}
 function _u32(n){return [n&255,(n>>>8)&255,(n>>>16)&255,(n>>>24)&255];}
 function _bytes(s){return Array.from(new TextEncoder().encode(String(s)));}
@@ -831,179 +837,99 @@ function _zipStore(files){
   return new Uint8Array(out);
 }
 function _col(n){let s='';n--;do{s=String.fromCharCode(65+(n%26))+s;n=Math.floor(n/26)-1;}while(n>=0);return s;}
-function _xlsxStyle(){
-  const fonts=[
-    '<font><name val="Aptos"/><sz val="11"/><color rgb="FF0F172A"/></font>',
-    '<font><name val="Aptos"/><b/><sz val="10"/><color rgb="FFFFFFFF"/></font>',
-    '<font><name val="Aptos"/><sz val="10"/><color rgb="FF0F172A"/></font>',
-    '<font><name val="Aptos Display"/><b/><sz val="25"/><color rgb="FF173B8F"/></font>',
-    '<font><name val="Aptos Display"/><b/><sz val="16"/><color rgb="FF633BFF"/></font>',
-    '<font><name val="Aptos"/><b/><sz val="9"/><color rgb="FF64748B"/></font>',
-    '<font><name val="Aptos"/><b/><sz val="21"/><color rgb="FF173B8F"/></font>',
-    '<font><name val="Aptos"/><b/><sz val="21"/><color rgb="FF32905A"/></font>',
-    '<font><name val="Aptos"/><b/><sz val="21"/><color rgb="FFE58A00"/></font>',
-    '<font><name val="Aptos"/><b/><sz val="21"/><color rgb="FF6B36C9"/></font>',
-    '<font><name val="Aptos"/><b/><sz val="10"/><color rgb="FF0F172A"/></font>'
-  ];
-  const fills=['<fill><patternFill patternType="none"/></fill>','<fill><patternFill patternType="gray125"/></fill>'];
-  ['FF173B8F','FFE8F1FF','FFE8F8EF','FFFFF5DE','FFF0EBFF','FFF8FAFC','FFFFE7A6','FFD9C8FF','FFC9E8D0','FFFFC9C9'].forEach(c=>fills.push('<fill><patternFill patternType="solid"><fgColor rgb="'+c+'"/><bgColor indexed="64"/></patternFill></fill>'));
-  const border='<border><left style="thin"><color rgb="FFD5DEEE"/></left><right style="thin"><color rgb="FFD5DEEE"/></right><top style="thin"><color rgb="FFD5DEEE"/></top><bottom style="thin"><color rgb="FFD5DEEE"/></bottom><diagonal/></border>';
-  const borders='<border><left/><right/><top/><bottom/><diagonal/></border>'+border;
-  const xfs=[];
-  const xf=(font,fill,borderId=1,align='left',wrap=true)=>'<xf numFmtId="0" fontId="'+font+'" fillId="'+fill+'" borderId="'+borderId+'" applyFont="1" applyFill="1" applyBorder="1"><alignment horizontal="'+align+'" vertical="center"'+(wrap?' wrapText="1"':'')+'/></xf>';
-  xfs.push(xf(0,2,0,'left',false)); //0 white base
-  xfs.push(xf(1,2,1,'center',false)); //1 navy header
-  xfs.push(xf(2,7,1,'left',true)); //2 alternating white-ish
-  xfs.push(xf(3,0,0,'center',false)); //3 title
-  xfs.push(xf(4,0,0,'center',false)); //4 subtitle
-  xfs.push(xf(5,0,0,'center',false)); //5 meta
-  xfs.push(xf(6,3,1,'center',false)); //6 total KPI
-  xfs.push(xf(7,4,1,'center',false)); //7 complete KPI
-  xfs.push(xf(8,5,1,'center',false)); //8 pending KPI
-  xfs.push(xf(9,6,1,'center',false)); //9 progress KPI
-  xfs.push(xf(10,7,1,'left',true)); //10 alternate
-  xfs.push(xf(10,8,1,'left',true)); //11 medium priority
-  xfs.push(xf(10,9,1,'left',true)); //12 in progress
-  xfs.push(xf(10,10,1,'left',true)); //13 completed
-  xfs.push(xf(10,11,1,'left',true)); //14 pending
-  return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
-    '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'+
-    '<numFmts count="0"/><fonts count="'+fonts.length+'">'+fonts.join('')+'</fonts>'+ 
-    '<fills count="'+fills.length+'">'+fills.join('')+'</fills>'+ 
-    '<borders count="2">'+borders+'</borders>'+ 
-    '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>'+ 
-    '<cellXfs count="'+xfs.length+'">'+xfs.join('')+'</cellXfs>'+ 
-    '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>'+ 
-    '<tableStyles count="0" defaultTableStyle="TableStyleMedium2" defaultPivotStyle="PivotStyleLight16"/>'+
-    '</styleSheet>';
-}
-function _xlsxCell(ref,val,style){
-  const s=String(val==null?'':val);
-  if(typeof val==='number' && isFinite(val))return '<c r="'+ref+'" s="'+style+'" t="n"><v>'+val+'</v></c>';
-  return '<c r="'+ref+'" s="'+style+'" t="inlineStr"><is><t xml:space="preserve">'+_rEsc(s)+'</t></is></c>';
-}
-/* ---------- Excel 2007+ writer — OpenXML template based ---------- */
-const _XLSX_STATIC = {
-  core: "<cp:coreProperties xmlns:cp=\"http://schemas.openxmlformats.org/package/2006/metadata/core-properties\"><dc:creator xmlns:dc=\"http://purl.org/dc/elements/1.1/\">openpyxl</dc:creator><dcterms:created xmlns:dcterms=\"http://purl.org/dc/terms/\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:type=\"dcterms:W3CDTF\">2026-08-13T10:31:12Z</dcterms:created><dcterms:modified xmlns:dcterms=\"http://purl.org/dc/terms/\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:type=\"dcterms:W3CDTF\">2026-08-13T10:31:12Z</dcterms:modified></cp:coreProperties>",
-  contentTypes: "<Types xmlns=\"http://schemas.openxmlformats.org/package/2006/content-types\"><Default Extension=\"rels\" ContentType=\"application/vnd.openxmlformats-package.relationships+xml\"/><Default Extension=\"xml\" ContentType=\"application/xml\"/><Override PartName=\"/xl/styles.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml\"/><Override PartName=\"/xl/theme/theme1.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.theme+xml\"/><Override PartName=\"/docProps/core.xml\" ContentType=\"application/vnd.openxmlformats-package.core-properties+xml\"/><Override PartName=\"/docProps/app.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.extended-properties+xml\"/><Override PartName=\"/xl/worksheets/sheet1.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml\"/><Override PartName=\"/xl/workbook.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml\"/></Types>",
-  rootRels: "<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\"><Relationship Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument\" Target=\"xl/workbook.xml\" Id=\"rId1\"/><Relationship Type=\"http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties\" Target=\"docProps/core.xml\" Id=\"rId2\"/><Relationship Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties\" Target=\"docProps/app.xml\" Id=\"rId3\"/></Relationships>",
-  workbook: "<workbook xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"><workbookPr/><workbookProtection/><bookViews><workbookView visibility=\"visible\" minimized=\"0\" showHorizontalScroll=\"1\" showVerticalScroll=\"1\" showSheetTabs=\"1\" tabRatio=\"600\" firstSheet=\"0\" activeTab=\"0\" autoFilterDateGrouping=\"1\"/></bookViews><sheets><sheet xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\" name=\"Task Report\" sheetId=\"1\" state=\"visible\" r:id=\"rId1\"/></sheets><definedNames><definedName name=\"_xlnm._FilterDatabase\" localSheetId=\"0\" hidden=\"1\">'Task Report'!$A$7:$H$13</definedName></definedNames><calcPr calcId=\"124519\" fullCalcOnLoad=\"1\"/></workbook>",
-  workbookRels: "<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\"><Relationship Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet\" Target=\"/xl/worksheets/sheet1.xml\" Id=\"rId1\"/><Relationship Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles\" Target=\"styles.xml\" Id=\"rId2\"/><Relationship Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme\" Target=\"theme/theme1.xml\" Id=\"rId3\"/></Relationships>",
-  styles: "<styleSheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"><numFmts count=\"0\"/><fonts count=\"11\"><font><name val=\"Calibri\"/><family val=\"2\"/><color theme=\"1\"/><sz val=\"11\"/><scheme val=\"minor\"/></font><font><name val=\"Aptos Display\"/><b val=\"1\"/><color rgb=\"00173B8F\"/><sz val=\"25\"/></font><font><name val=\"Aptos Display\"/><b val=\"1\"/><color rgb=\"00633BFF\"/><sz val=\"16\"/></font><font><name val=\"Aptos\"/><b val=\"1\"/><color rgb=\"0064748B\"/><sz val=\"9\"/></font><font><name val=\"Aptos\"/><b val=\"1\"/><color rgb=\"00FFFFFF\"/><sz val=\"11\"/></font><font><name val=\"Aptos\"/><b val=\"1\"/><color rgb=\"00173B8F\"/><sz val=\"21\"/></font><font><name val=\"Aptos\"/><b val=\"1\"/><color rgb=\"0032905A\"/><sz val=\"21\"/></font><font><name val=\"Aptos\"/><b val=\"1\"/><color rgb=\"00E58A00\"/><sz val=\"21\"/></font><font><name val=\"Aptos\"/><b val=\"1\"/><color rgb=\"006B36C9\"/><sz val=\"21\"/></font><font><name val=\"Aptos\"/><b val=\"1\"/><color rgb=\"00FFFFFF\"/><sz val=\"10\"/></font><font><name val=\"Aptos\"/><b val=\"1\"/><color rgb=\"000F172A\"/><sz val=\"10\"/></font></fonts><fills count=\"14\"><fill><patternFill/></fill><fill><patternFill patternType=\"gray125\"/></fill><fill><patternFill patternType=\"solid\"><fgColor rgb=\"00173B8F\"/></patternFill></fill><fill><patternFill patternType=\"solid\"><fgColor rgb=\"00E8F1FF\"/></patternFill></fill><fill><patternFill patternType=\"solid\"><fgColor rgb=\"00E8F8EF\"/></patternFill></fill><fill><patternFill patternType=\"solid\"><fgColor rgb=\"00FFF5DE\"/></patternFill></fill><fill><patternFill patternType=\"solid\"><fgColor rgb=\"00F0EBFF\"/></patternFill></fill><fill><patternFill patternType=\"solid\"><fgColor rgb=\"00FFFFFF\"/></patternFill></fill><fill><patternFill patternType=\"solid\"><fgColor rgb=\"00FFE7A6\"/></patternFill></fill><fill><patternFill patternType=\"solid\"><fgColor rgb=\"00FFD08A\"/></patternFill></fill><fill><patternFill patternType=\"solid\"><fgColor rgb=\"00F8FAFC\"/></patternFill></fill><fill><patternFill patternType=\"solid\"><fgColor rgb=\"00D9C8FF\"/></patternFill></fill><fill><patternFill patternType=\"solid\"><fgColor rgb=\"00FFC9C9\"/></patternFill></fill><fill><patternFill patternType=\"solid\"><fgColor rgb=\"00C9E8D0\"/></patternFill></fill></fills><borders count=\"2\"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style=\"thin\"><color rgb=\"00D5DEEE\"/></left><right style=\"thin\"><color rgb=\"00D5DEEE\"/></right><top style=\"thin\"><color rgb=\"00D5DEEE\"/></top><bottom style=\"thin\"><color rgb=\"00D5DEEE\"/></bottom></border></borders><cellStyleXfs count=\"1\"><xf numFmtId=\"0\" fontId=\"0\" fillId=\"0\" borderId=\"0\"/></cellStyleXfs><cellXfs count=\"17\"><xf numFmtId=\"0\" fontId=\"0\" fillId=\"0\" borderId=\"0\" pivotButton=\"0\" quotePrefix=\"0\" xfId=\"0\"/><xf numFmtId=\"0\" fontId=\"1\" fillId=\"0\" borderId=\"0\" applyAlignment=\"1\" pivotButton=\"0\" quotePrefix=\"0\" xfId=\"0\"><alignment horizontal=\"center\" vertical=\"center\"/></xf><xf numFmtId=\"0\" fontId=\"2\" fillId=\"0\" borderId=\"0\" applyAlignment=\"1\" pivotButton=\"0\" quotePrefix=\"0\" xfId=\"0\"><alignment horizontal=\"center\" vertical=\"center\"/></xf><xf numFmtId=\"0\" fontId=\"3\" fillId=\"0\" borderId=\"0\" applyAlignment=\"1\" pivotButton=\"0\" quotePrefix=\"0\" xfId=\"0\"><alignment horizontal=\"center\" vertical=\"center\"/></xf><xf numFmtId=\"0\" fontId=\"4\" fillId=\"2\" borderId=\"1\" applyAlignment=\"1\" pivotButton=\"0\" quotePrefix=\"0\" xfId=\"0\"><alignment horizontal=\"center\" vertical=\"center\"/></xf><xf numFmtId=\"0\" fontId=\"5\" fillId=\"3\" borderId=\"1\" applyAlignment=\"1\" pivotButton=\"0\" quotePrefix=\"0\" xfId=\"0\"><alignment horizontal=\"center\" vertical=\"center\"/></xf><xf numFmtId=\"0\" fontId=\"6\" fillId=\"4\" borderId=\"1\" applyAlignment=\"1\" pivotButton=\"0\" quotePrefix=\"0\" xfId=\"0\"><alignment horizontal=\"center\" vertical=\"center\"/></xf><xf numFmtId=\"0\" fontId=\"7\" fillId=\"5\" borderId=\"1\" applyAlignment=\"1\" pivotButton=\"0\" quotePrefix=\"0\" xfId=\"0\"><alignment horizontal=\"center\" vertical=\"center\"/></xf><xf numFmtId=\"0\" fontId=\"8\" fillId=\"6\" borderId=\"1\" applyAlignment=\"1\" pivotButton=\"0\" quotePrefix=\"0\" xfId=\"0\"><alignment horizontal=\"center\" vertical=\"center\"/></xf><xf numFmtId=\"0\" fontId=\"9\" fillId=\"2\" borderId=\"1\" applyAlignment=\"1\" pivotButton=\"0\" quotePrefix=\"0\" xfId=\"0\"><alignment horizontal=\"left\" vertical=\"center\" wrapText=\"1\"/></xf><xf numFmtId=\"0\" fontId=\"10\" fillId=\"7\" borderId=\"1\" applyAlignment=\"1\" pivotButton=\"0\" quotePrefix=\"0\" xfId=\"0\"><alignment horizontal=\"left\" vertical=\"center\" wrapText=\"1\"/></xf><xf numFmtId=\"0\" fontId=\"10\" fillId=\"8\" borderId=\"1\" applyAlignment=\"1\" pivotButton=\"0\" quotePrefix=\"0\" xfId=\"0\"><alignment horizontal=\"left\" vertical=\"center\" wrapText=\"1\"/></xf><xf numFmtId=\"0\" fontId=\"10\" fillId=\"9\" borderId=\"1\" applyAlignment=\"1\" pivotButton=\"0\" quotePrefix=\"0\" xfId=\"0\"><alignment horizontal=\"left\" vertical=\"center\" wrapText=\"1\"/></xf><xf numFmtId=\"0\" fontId=\"10\" fillId=\"10\" borderId=\"1\" applyAlignment=\"1\" pivotButton=\"0\" quotePrefix=\"0\" xfId=\"0\"><alignment horizontal=\"left\" vertical=\"center\" wrapText=\"1\"/></xf><xf numFmtId=\"0\" fontId=\"10\" fillId=\"11\" borderId=\"1\" applyAlignment=\"1\" pivotButton=\"0\" quotePrefix=\"0\" xfId=\"0\"><alignment horizontal=\"left\" vertical=\"center\" wrapText=\"1\"/></xf><xf numFmtId=\"0\" fontId=\"10\" fillId=\"12\" borderId=\"1\" applyAlignment=\"1\" pivotButton=\"0\" quotePrefix=\"0\" xfId=\"0\"><alignment horizontal=\"left\" vertical=\"center\" wrapText=\"1\"/></xf><xf numFmtId=\"0\" fontId=\"10\" fillId=\"13\" borderId=\"1\" applyAlignment=\"1\" pivotButton=\"0\" quotePrefix=\"0\" xfId=\"0\"><alignment horizontal=\"left\" vertical=\"center\" wrapText=\"1\"/></xf></cellXfs><cellStyles count=\"1\"><cellStyle name=\"Normal\" xfId=\"0\" builtinId=\"0\" hidden=\"0\"/></cellStyles><tableStyles count=\"0\" defaultTableStyle=\"TableStyleMedium9\" defaultPivotStyle=\"PivotStyleLight16\"/><colors><indexedColors><rgbColor rgb=\"00000000\"/><rgbColor rgb=\"00FFFFFF\"/><rgbColor rgb=\"00FF0000\"/><rgbColor rgb=\"0000FF00\"/><rgbColor rgb=\"000000FF\"/><rgbColor rgb=\"00FFFF00\"/><rgbColor rgb=\"00FF00FF\"/><rgbColor rgb=\"0000FFFF\"/><rgbColor rgb=\"00000000\"/><rgbColor rgb=\"00FFFFFF\"/><rgbColor rgb=\"00FF0000\"/><rgbColor rgb=\"0000FF00\"/><rgbColor rgb=\"000000FF\"/><rgbColor rgb=\"00FFFF00\"/><rgbColor rgb=\"00FF00FF\"/><rgbColor rgb=\"0000FFFF\"/><rgbColor rgb=\"00800000\"/><rgbColor rgb=\"00008000\"/><rgbColor rgb=\"00000080\"/><rgbColor rgb=\"00808000\"/><rgbColor rgb=\"00800080\"/><rgbColor rgb=\"00008080\"/><rgbColor rgb=\"00C0C0C0\"/><rgbColor rgb=\"00808080\"/><rgbColor rgb=\"009999FF\"/><rgbColor rgb=\"00993366\"/><rgbColor rgb=\"00FFFFCC\"/><rgbColor rgb=\"00CCFFFF\"/><rgbColor rgb=\"00660066\"/><rgbColor rgb=\"00FF8080\"/><rgbColor rgb=\"000066CC\"/><rgbColor rgb=\"00CCCCFF\"/><rgbColor rgb=\"00000080\"/><rgbColor rgb=\"00FF00FF\"/><rgbColor rgb=\"00FFFF00\"/><rgbColor rgb=\"0000FFFF\"/><rgbColor rgb=\"00800080\"/><rgbColor rgb=\"00800000\"/><rgbColor rgb=\"00008080\"/><rgbColor rgb=\"000000FF\"/><rgbColor rgb=\"0000CCFF\"/><rgbColor rgb=\"00CCFFFF\"/><rgbColor rgb=\"00CCFFCC\"/><rgbColor rgb=\"00FFFF99\"/><rgbColor rgb=\"0099CCFF\"/><rgbColor rgb=\"00FF99CC\"/><rgbColor rgb=\"00CC99FF\"/><rgbColor rgb=\"00FFCC99\"/><rgbColor rgb=\"003366FF\"/><rgbColor rgb=\"0033CCCC\"/><rgbColor rgb=\"0099CC00\"/><rgbColor rgb=\"00FFCC00\"/><rgbColor rgb=\"00FF9900\"/><rgbColor rgb=\"00FF6600\"/><rgbColor rgb=\"00666699\"/><rgbColor rgb=\"00969696\"/><rgbColor rgb=\"00003366\"/><rgbColor rgb=\"00339966\"/><rgbColor rgb=\"00003300\"/><rgbColor rgb=\"00333300\"/><rgbColor rgb=\"00993300\"/><rgbColor rgb=\"00993366\"/><rgbColor rgb=\"00333399\"/><rgbColor rgb=\"00333333\"/></indexedColors></colors></styleSheet>",
-  theme: "<?xml version=\"1.0\"?>\n<a:theme xmlns:a=\"http://schemas.openxmlformats.org/drawingml/2006/main\" name=\"Office Theme\">\n  <a:themeElements>\n    <a:clrScheme name=\"Office\">\n      <a:dk1>\n        <a:sysClr val=\"windowText\" lastClr=\"000000\"/>\n      </a:dk1>\n      <a:lt1>\n        <a:sysClr val=\"window\" lastClr=\"FFFFFF\"/>\n      </a:lt1>\n      <a:dk2>\n        <a:srgbClr val=\"1F497D\"/>\n      </a:dk2>\n      <a:lt2>\n        <a:srgbClr val=\"EEECE1\"/>\n      </a:lt2>\n      <a:accent1>\n        <a:srgbClr val=\"4F81BD\"/>\n      </a:accent1>\n      <a:accent2>\n        <a:srgbClr val=\"C0504D\"/>\n      </a:accent2>\n      <a:accent3>\n        <a:srgbClr val=\"9BBB59\"/>\n      </a:accent3>\n      <a:accent4>\n        <a:srgbClr val=\"8064A2\"/>\n      </a:accent4>\n      <a:accent5>\n        <a:srgbClr val=\"4BACC6\"/>\n      </a:accent5>\n      <a:accent6>\n        <a:srgbClr val=\"F79646\"/>\n      </a:accent6>\n      <a:hlink>\n        <a:srgbClr val=\"0000FF\"/>\n      </a:hlink>\n      <a:folHlink>\n        <a:srgbClr val=\"800080\"/>\n      </a:folHlink>\n    </a:clrScheme>\n    <a:fontScheme name=\"Office\">\n      <a:majorFont>\n        <a:latin typeface=\"Cambria\"/>\n        <a:ea typeface=\"\"/>\n        <a:cs typeface=\"\"/>\n        <a:font script=\"Jpan\" typeface=\"&#xFF2D;&#xFF33; &#xFF30;&#x30B4;&#x30B7;&#x30C3;&#x30AF;\"/>\n        <a:font script=\"Hang\" typeface=\"&#xB9D1;&#xC740; &#xACE0;&#xB515;\"/>\n        <a:font script=\"Hans\" typeface=\"&#x5B8B;&#x4F53;\"/>\n        <a:font script=\"Hant\" typeface=\"&#x65B0;&#x7D30;&#x660E;&#x9AD4;\"/>\n        <a:font script=\"Arab\" typeface=\"Times New Roman\"/>\n        <a:font script=\"Hebr\" typeface=\"Times New Roman\"/>\n        <a:font script=\"Thai\" typeface=\"Tahoma\"/>\n        <a:font script=\"Ethi\" typeface=\"Nyala\"/>\n        <a:font script=\"Beng\" typeface=\"Vrinda\"/>\n        <a:font script=\"Gujr\" typeface=\"Shruti\"/>\n        <a:font script=\"Khmr\" typeface=\"MoolBoran\"/>\n        <a:font script=\"Knda\" typeface=\"Tunga\"/>\n        <a:font script=\"Guru\" typeface=\"Raavi\"/>\n        <a:font script=\"Cans\" typeface=\"Euphemia\"/>\n        <a:font script=\"Cher\" typeface=\"Plantagenet Cherokee\"/>\n        <a:font script=\"Yiii\" typeface=\"Microsoft Yi Baiti\"/>\n        <a:font script=\"Tibt\" typeface=\"Microsoft Himalaya\"/>\n        <a:font script=\"Thaa\" typeface=\"MV Boli\"/>\n        <a:font script=\"Deva\" typeface=\"Mangal\"/>\n        <a:font script=\"Telu\" typeface=\"Gautami\"/>\n        <a:font script=\"Taml\" typeface=\"Latha\"/>\n        <a:font script=\"Syrc\" typeface=\"Estrangelo Edessa\"/>\n        <a:font script=\"Orya\" typeface=\"Kalinga\"/>\n        <a:font script=\"Mlym\" typeface=\"Kartika\"/>\n        <a:font script=\"Laoo\" typeface=\"DokChampa\"/>\n        <a:font script=\"Sinh\" typeface=\"Iskoola Pota\"/>\n        <a:font script=\"Mong\" typeface=\"Mongolian Baiti\"/>\n        <a:font script=\"Viet\" typeface=\"Times New Roman\"/>\n        <a:font script=\"Uigh\" typeface=\"Microsoft Uighur\"/>\n      </a:majorFont>\n      <a:minorFont>\n        <a:latin typeface=\"Calibri\"/>\n        <a:ea typeface=\"\"/>\n        <a:cs typeface=\"\"/>\n        <a:font script=\"Jpan\" typeface=\"&#xFF2D;&#xFF33; &#xFF30;&#x30B4;&#x30B7;&#x30C3;&#x30AF;\"/>\n        <a:font script=\"Hang\" typeface=\"&#xB9D1;&#xC740; &#xACE0;&#xB515;\"/>\n        <a:font script=\"Hans\" typeface=\"&#x5B8B;&#x4F53;\"/>\n        <a:font script=\"Hant\" typeface=\"&#x65B0;&#x7D30;&#x660E;&#x9AD4;\"/>\n        <a:font script=\"Arab\" typeface=\"Arial\"/>\n        <a:font script=\"Hebr\" typeface=\"Arial\"/>\n        <a:font script=\"Thai\" typeface=\"Tahoma\"/>\n        <a:font script=\"Ethi\" typeface=\"Nyala\"/>\n        <a:font script=\"Beng\" typeface=\"Vrinda\"/>\n        <a:font script=\"Gujr\" typeface=\"Shruti\"/>\n        <a:font script=\"Khmr\" typeface=\"DaunPenh\"/>\n        <a:font script=\"Knda\" typeface=\"Tunga\"/>\n        <a:font script=\"Guru\" typeface=\"Raavi\"/>\n        <a:font script=\"Cans\" typeface=\"Euphemia\"/>\n        <a:font script=\"Cher\" typeface=\"Plantagenet Cherokee\"/>\n        <a:font script=\"Yiii\" typeface=\"Microsoft Yi Baiti\"/>\n        <a:font script=\"Tibt\" typeface=\"Microsoft Himalaya\"/>\n        <a:font script=\"Thaa\" typeface=\"MV Boli\"/>\n        <a:font script=\"Deva\" typeface=\"Mangal\"/>\n        <a:font script=\"Telu\" typeface=\"Gautami\"/>\n        <a:font script=\"Taml\" typeface=\"Latha\"/>\n        <a:font script=\"Syrc\" typeface=\"Estrangelo Edessa\"/>\n        <a:font script=\"Orya\" typeface=\"Kalinga\"/>\n        <a:font script=\"Mlym\" typeface=\"Kartika\"/>\n        <a:font script=\"Laoo\" typeface=\"DokChampa\"/>\n        <a:font script=\"Sinh\" typeface=\"Iskoola Pota\"/>\n        <a:font script=\"Mong\" typeface=\"Mongolian Baiti\"/>\n        <a:font script=\"Viet\" typeface=\"Arial\"/>\n        <a:font script=\"Uigh\" typeface=\"Microsoft Uighur\"/>\n      </a:minorFont>\n    </a:fontScheme>\n    <a:fmtScheme name=\"Office\">\n      <a:fillStyleLst>\n        <a:solidFill>\n          <a:schemeClr val=\"phClr\"/>\n        </a:solidFill>\n        <a:gradFill rotWithShape=\"1\">\n          <a:gsLst>\n            <a:gs pos=\"0\">\n              <a:schemeClr val=\"phClr\">\n                <a:tint val=\"50000\"/>\n                <a:satMod val=\"300000\"/>\n              </a:schemeClr>\n            </a:gs>\n            <a:gs pos=\"35000\">\n              <a:schemeClr val=\"phClr\">\n                <a:tint val=\"37000\"/>\n                <a:satMod val=\"300000\"/>\n              </a:schemeClr>\n            </a:gs>\n            <a:gs pos=\"100000\">\n              <a:schemeClr val=\"phClr\">\n                <a:tint val=\"15000\"/>\n                <a:satMod val=\"350000\"/>\n              </a:schemeClr>\n            </a:gs>\n          </a:gsLst>\n          <a:lin ang=\"16200000\" scaled=\"1\"/>\n        </a:gradFill>\n        <a:gradFill rotWithShape=\"1\">\n          <a:gsLst>\n            <a:gs pos=\"0\">\n              <a:schemeClr val=\"phClr\">\n                <a:shade val=\"51000\"/>\n                <a:satMod val=\"130000\"/>\n              </a:schemeClr>\n            </a:gs>\n            <a:gs pos=\"80000\">\n              <a:schemeClr val=\"phClr\">\n                <a:shade val=\"93000\"/>\n                <a:satMod val=\"130000\"/>\n              </a:schemeClr>\n            </a:gs>\n            <a:gs pos=\"100000\">\n              <a:schemeClr val=\"phClr\">\n                <a:shade val=\"94000\"/>\n                <a:satMod val=\"135000\"/>\n              </a:schemeClr>\n            </a:gs>\n          </a:gsLst>\n          <a:lin ang=\"16200000\" scaled=\"0\"/>\n        </a:gradFill>\n      </a:fillStyleLst>\n      <a:lnStyleLst>\n        <a:ln w=\"9525\" cap=\"flat\" cmpd=\"sng\" algn=\"ctr\">\n          <a:solidFill>\n            <a:schemeClr val=\"phClr\">\n              <a:shade val=\"95000\"/>\n              <a:satMod val=\"105000\"/>\n            </a:schemeClr>\n          </a:solidFill>\n          <a:prstDash val=\"solid\"/>\n        </a:ln>\n        <a:ln w=\"25400\" cap=\"flat\" cmpd=\"sng\" algn=\"ctr\">\n          <a:solidFill>\n            <a:schemeClr val=\"phClr\"/>\n          </a:solidFill>\n          <a:prstDash val=\"solid\"/>\n        </a:ln>\n        <a:ln w=\"38100\" cap=\"flat\" cmpd=\"sng\" algn=\"ctr\">\n          <a:solidFill>\n            <a:schemeClr val=\"phClr\"/>\n          </a:solidFill>\n          <a:prstDash val=\"solid\"/>\n        </a:ln>\n      </a:lnStyleLst>\n      <a:effectStyleLst>\n        <a:effectStyle>\n          <a:effectLst>\n            <a:outerShdw blurRad=\"40000\" dist=\"20000\" dir=\"5400000\" rotWithShape=\"0\">\n              <a:srgbClr val=\"000000\">\n                <a:alpha val=\"38000\"/>\n              </a:srgbClr>\n            </a:outerShdw>\n          </a:effectLst>\n        </a:effectStyle>\n        <a:effectStyle>\n          <a:effectLst>\n            <a:outerShdw blurRad=\"40000\" dist=\"23000\" dir=\"5400000\" rotWithShape=\"0\">\n              <a:srgbClr val=\"000000\">\n                <a:alpha val=\"35000\"/>\n              </a:srgbClr>\n            </a:outerShdw>\n          </a:effectLst>\n        </a:effectStyle>\n        <a:effectStyle>\n          <a:effectLst>\n            <a:outerShdw blurRad=\"40000\" dist=\"23000\" dir=\"5400000\" rotWithShape=\"0\">\n              <a:srgbClr val=\"000000\">\n                <a:alpha val=\"35000\"/>\n              </a:srgbClr>\n            </a:outerShdw>\n          </a:effectLst>\n          <a:scene3d>\n            <a:camera prst=\"orthographicFront\">\n              <a:rot lat=\"0\" lon=\"0\" rev=\"0\"/>\n            </a:camera>\n            <a:lightRig rig=\"threePt\" dir=\"t\">\n              <a:rot lat=\"0\" lon=\"0\" rev=\"1200000\"/>\n            </a:lightRig>\n          </a:scene3d>\n          <a:sp3d>\n            <a:bevelT w=\"63500\" h=\"25400\"/>\n          </a:sp3d>\n        </a:effectStyle>\n      </a:effectStyleLst>\n      <a:bgFillStyleLst>\n        <a:solidFill>\n          <a:schemeClr val=\"phClr\"/>\n        </a:solidFill>\n        <a:gradFill rotWithShape=\"1\">\n          <a:gsLst>\n            <a:gs pos=\"0\">\n              <a:schemeClr val=\"phClr\">\n                <a:tint val=\"40000\"/>\n                <a:satMod val=\"350000\"/>\n              </a:schemeClr>\n            </a:gs>\n            <a:gs pos=\"40000\">\n              <a:schemeClr val=\"phClr\">\n                <a:tint val=\"45000\"/>\n                <a:shade val=\"99000\"/>\n                <a:satMod val=\"350000\"/>\n              </a:schemeClr>\n            </a:gs>\n            <a:gs pos=\"100000\">\n              <a:schemeClr val=\"phClr\">\n                <a:shade val=\"20000\"/>\n                <a:satMod val=\"255000\"/>\n              </a:schemeClr>\n            </a:gs>\n          </a:gsLst>\n          <a:path path=\"circle\">\n            <a:fillToRect l=\"50000\" t=\"-80000\" r=\"50000\" b=\"180000\"/>\n          </a:path>\n        </a:gradFill>\n        <a:gradFill rotWithShape=\"1\">\n          <a:gsLst>\n            <a:gs pos=\"0\">\n              <a:schemeClr val=\"phClr\">\n                <a:tint val=\"80000\"/>\n                <a:satMod val=\"300000\"/>\n              </a:schemeClr>\n            </a:gs>\n            <a:gs pos=\"100000\">\n              <a:schemeClr val=\"phClr\">\n                <a:shade val=\"30000\"/>\n                <a:satMod val=\"200000\"/>\n              </a:schemeClr>\n            </a:gs>\n          </a:gsLst>\n          <a:path path=\"circle\">\n            <a:fillToRect l=\"50000\" t=\"50000\" r=\"50000\" b=\"50000\"/>\n          </a:path>\n        </a:gradFill>\n      </a:bgFillStyleLst>\n    </a:fmtScheme>\n  </a:themeElements>\n  <a:objectDefaults/>\n  <a:extraClrSchemeLst/>\n</a:theme>\n",
-  app: "<Properties xmlns=\"http://schemas.openxmlformats.org/officeDocument/2006/extended-properties\"><Application>Microsoft Excel Compatible / Openpyxl 3.1.5</Application><AppVersion>3.1</AppVersion></Properties>"
-};
-function _xlsxEsc(v){
-  return String(v==null?'':v)
-    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
-    .replace(/>/g,'&gt;').replace(/"/g,'&quot;')
-    .replace(/'/g,'&apos;');
-}
-function _xlsxCell2(ref,val,style){
+function _xlsxCell(ref,val,style=0){
   const s=_xlsxEsc(val);
-  if(typeof val==='number' && isFinite(val)){
-    return '<c r="'+ref+'" s="'+style+'" t="n"><v>'+val+'</v></c>';
-  }
+  if(typeof val==='number' && isFinite(val))return '<c r="'+ref+'" s="'+style+'" t="n"><v>'+val+'</v></c>';
   return '<c r="'+ref+'" s="'+style+'" t="inlineStr"><is><t xml:space="preserve">'+s+'</t></is></c>';
 }
+const _XLSX_TABLE_STYLES='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
+'<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'+
+'<numFmts count="0"/>'+ 
+'<fonts count="5">'+
+'<font><name val="Calibri"/><sz val="11"/><color rgb="FF0F172A"/></font>'+
+'<font><name val="Calibri"/><b/><sz val="11"/><color rgb="FFFFFFFF"/></font>'+
+'<font><name val="Calibri"/><b/><sz val="11"/><color rgb="FF0F172A"/></font>'+
+'<font><name val="Calibri"/><b/><sz val="10"/><color rgb="FF0F172A"/></font>'+
+'<font><name val="Calibri"/><sz val="10"/><color rgb="FF0F172A"/></font>'+
+'</fonts>'+
+'<fills count="7">'+
+'<fill><patternFill patternType="none"/></fill>'+
+'<fill><patternFill patternType="gray125"/></fill>'+
+'<fill><patternFill patternType="solid"><fgColor rgb="FF173B8F"/><bgColor indexed="64"/></patternFill></fill>'+
+'<fill><patternFill patternType="solid"><fgColor rgb="FFF8FAFC"/><bgColor indexed="64"/></patternFill></fill>'+
+'<fill><patternFill patternType="solid"><fgColor rgb="FFE8F1FF"/><bgColor indexed="64"/></patternFill></fill>'+
+'<fill><patternFill patternType="solid"><fgColor rgb="FFFFE7A6"/><bgColor indexed="64"/></patternFill></fill>'+
+'<fill><patternFill patternType="solid"><fgColor rgb="FFD9C8FF"/><bgColor indexed="64"/></patternFill></fill>'+
+'</fills>'+
+'<borders count="2">'+
+'<border><left/><right/><top/><bottom/><diagonal/></border>'+
+'<border><left style="thin"><color rgb="FFD5DEEE"/></left><right style="thin"><color rgb="FFD5DEEE"/></right><top style="thin"><color rgb="FFD5DEEE"/></top><bottom style="thin"><color rgb="FFD5DEEE"/></bottom><diagonal/></border>'+
+'</borders>'+
+'<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>'+
+'<cellXfs count="7">'+
+'<xf numFmtId="0" fontId="0" fillId="0" borderId="0"/>'+
+'<xf numFmtId="0" fontId="1" fillId="2" borderId="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>'+
+'<xf numFmtId="0" fontId="2" fillId="4" borderId="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf>'+
+'<xf numFmtId="0" fontId="3" fillId="3" borderId="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf>'+
+'<xf numFmtId="0" fontId="3" fillId="5" borderId="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>'+
+'<xf numFmtId="0" fontId="3" fillId="6" borderId="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>'+
+'<xf numFmtId="0" fontId="4" fillId="3" borderId="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf>'+
+'</cellXfs>'+
+'<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>'+
+'<tableStyles count="0" defaultTableStyle="TableStyleMedium2" defaultPivotStyle="PivotStyleLight16"/>'+
+'</styleSheet>';
+const _XLSX_THEME='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><a:theme xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" name="Office Theme"><a:themeElements><a:clrScheme name="Office"><a:dk1><a:sysClr val="windowText" lastClr="000000"/></a:dk1><a:lt1><a:sysClr val="window" lastClr="FFFFFF"/></a:lt1><a:dk2><a:srgbClr val="44546A"/></a:dk2><a:lt2><a:srgbClr val="E7E6E6"/></a:lt2><a:accent1><a:srgbClr val="4472C4"/></a:accent1><a:accent2><a:srgbClr val="ED7D31"/></a:accent2><a:accent3><a:srgbClr val="A5A5A5"/></a:accent3><a:accent4><a:srgbClr val="FFC000"/></a:accent4><a:accent5><a:srgbClr val="5B9BD5"/></a:accent5><a:accent6><a:srgbClr val="70AD47"/></a:accent6><a:hlink><a:srgbClr val="0563C1"/></a:hlink><a:folHlink><a:srgbClr val="954F72"/></a:folHlink></a:clrScheme><a:fontScheme name="Office"><a:majorFont><a:latin typeface="Calibri Light"/></a:majorFont><a:minorFont><a:latin typeface="Calibri"/></a:minorFont></a:fontScheme><a:fmtScheme name="Office"><a:fillStyleLst><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:fillStyleLst><a:lnStyleLst><a:ln w="9525"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:prstDash val="solid"/></a:ln></a:lnStyleLst><a:effectStyleLst><a:effectStyle><a:effectLst/></a:effectStyle></a:effectStyleLst><a:bgFillStyleLst><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:bgFillStyleLst></a:fmtScheme></a:themeElements></a:theme>';
+const _XLSX_CT='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/><Override PartName="/xl/theme/theme1.xml" ContentType="application/vnd.openxmlformats-officedocument.theme+xml"/><Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/><Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/></Types>';
 function _makeXlsx(rows,f){
-  const total=rows.length;
-  const complete=rows.filter(r=>r[7]==='Completed').length;
-  const pending=rows.filter(r=>r[7]==='Pending').length;
-  const progress=rows.filter(r=>r[7]==='In Progress').length;
-  const generated=_rDate();
-  const emp=f.employee||'ALL';
-  const period=String(f.period||'all').toUpperCase();
-
-  let sd='';
-  sd+='<row r="1" ht="34" customHeight="1">'+_xlsxCell2('A1','TASK COMMAND',1)+'</row>';
-  sd+='<row r="2" ht="26" customHeight="1">'+_xlsxCell2('A2','TASK PERFORMANCE REPORT',2)+'</row>';
-  sd+='<row r="3" ht="22" customHeight="1">'+_xlsxCell2('A3','Employee: '+emp+'   |   Period: '+period+'   |   Generated: '+generated,3)+'</row>';
-
-  sd+='<row r="4" ht="22" customHeight="1">'+
-    _xlsxCell2('A4','TOTAL TASKS',4)+
-    _xlsxCell2('C4','COMPLETED',4)+
-    _xlsxCell2('E4','PENDING',4)+
-    _xlsxCell2('G4','IN PROGRESS',4)+'</row>';
-
-  sd+='<row r="5" ht="38" customHeight="1">'+
-    _xlsxCell2('A5',total,5)+
-    _xlsxCell2('C5',complete,6)+
-    _xlsxCell2('E5',pending,7)+
-    _xlsxCell2('G5',progress,8)+'</row>';
-
-  sd+='<row r="6" ht="10" customHeight="1"></row>';
-
-  const headers=['TASK ID','TASK TYPE','DEPARTMENT','ASSIGNED TO','ASSIGNED BY','PRIORITY','DEADLINE','STATUS'];
-  let hr='';
-  headers.forEach((h,i)=>hr+=_xlsxCell2(_col(i+1)+'7',h,9));
-  sd+='<row r="7" ht="26" customHeight="1">'+hr+'</row>';
-
-  rows.forEach((r,i)=>{
-    const rowNum=8+i;
-    const baseStyle=(i%2===0)?10:13;
-    let rr='';
-    for(let j=0;j<8;j++){
-      let st=baseStyle;
-      if(j===5) st=_rNorm(r[j])==='high'?15:11;
-      if(j===7){
-        const s=_rStatus(r[j]);
-        st=s==='Completed'?16:s==='In Progress'?14:12;
-      }
-      rr+=_xlsxCell2(_col(j+1)+rowNum,r[j],st);
-    }
-    sd+='<row r="'+rowNum+'" ht="42" customHeight="1">'+rr+'</row>';
+  const headers=['Task ID','Task Type','Department','Assigned To','Assigned By','Follow-up','Priority','Deadline','Status','Created At','Completed At'];
+  const out=[];
+  const safe=(v)=>v==null?'':String(v);
+  const created=t=>safe(t.createdAt||t.created_at||'');
+  const completed=t=>safe(t.completedAt||t.completed_at||'');
+  const taskRows=(Array.isArray(f.tasks)?f.tasks:[]).map(t=>[
+    safe(t.id||t.task_id||''),safe(t.taskType||t.task_type||''),safe(t.department||t.taskDepartment||'Other'),
+    safe(_rAssigned(t)),safe(t.createdByName||t.assignedBy||t.assigned_by_name||'Owner'),
+    safe(t.followUp||t.follow_up||t.followup||''),safe(t.priority||'Medium'),safe(t.deadline||''),_rStatus(t.status),created(t),completed(t)
+  ]);
+  // Header row — intentionally matches the supplied Excel reference.
+  let xml='';
+  xml+='<row r="1" ht="24" customHeight="1">';headers.forEach((h,i)=>xml+=_xlsxCell(_col(i+1)+1,h,1));xml+='</row>';
+  taskRows.forEach((r,i)=>{
+    const n=i+2, rowFill=(i%2===0)?2:3;
+    xml+='<row r="'+n+'" ht="30" customHeight="1">';
+    r.forEach((v,j)=>{
+      let st=rowFill;
+      if(j===6)st=_rNorm(v)==='high'?4:3;
+      if(j===8){const s=_rStatus(v);st=s==='In Progress'?5:(s==='Completed'?3:4);}
+      xml+=_xlsxCell(_col(j+1)+n,v,st);
+    });
+    xml+='</row>';
   });
-
-  const foot=8+rows.length;
-  sd+='<row r="'+foot+'" ht="24" customHeight="1">'+
-    _xlsxCell2('A'+foot,'TASK COMMAND   |   Centralized Team Management   |   '+total+' task(s) in this report',3)+
-    '</row>';
-
-  const lastTask=Math.max(7,7+rows.length);
-  const mergeRefs=[
-    'A1:H1','A2:H2','A3:H3',
-    'A4:B4','C4:D4','E4:F4','G4:H4',
-    'A5:B5','C5:D5','E5:F5','G5:H5',
-    'A'+foot+':H'+foot
-  ];
-
+  const last=Math.max(1,taskRows.length+1);
+  const widths=[22,34,18,28,28,22,13,15,17,24,24];
+  const cols=widths.map((w,i)=>'<col min="'+(i+1)+'" max="'+(i+1)+'" width="'+w+'" customWidth="1"/>').join('');
   const sheet='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
     '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'+
-    '<sheetPr><outlinePr summaryBelow="1" summaryRight="1"/><pageSetUpPr/></sheetPr>'+
-    '<dimension ref="A1:H'+foot+'"/>'+
-    '<sheetViews><sheetView showGridLines="0" workbookViewId="0">'+
-      '<pane ySplit="7" topLeftCell="A8" activePane="bottomLeft" state="frozen"/>'+
-      '<selection pane="bottomLeft" activeCell="A1" sqref="A1"/>'+
-    '</sheetView></sheetViews>'+
-    '<sheetFormatPr baseColWidth="8" defaultRowHeight="15"/>'+
-    '<cols>'+
-      '<col width="21" customWidth="1" min="1" max="1"/>'+
-      '<col width="34" customWidth="1" min="2" max="2"/>'+
-      '<col width="18" customWidth="1" min="3" max="3"/>'+
-      '<col width="25" customWidth="1" min="4" max="4"/>'+
-      '<col width="25" customWidth="1" min="5" max="5"/>'+
-      '<col width="13" customWidth="1" min="6" max="6"/>'+
-      '<col width="15" customWidth="1" min="7" max="7"/>'+
-      '<col width="17" customWidth="1" min="8" max="8"/>'+
-    '</cols>'+
-    '<sheetData>'+sd+'</sheetData>'+
-    '<autoFilter ref="A7:H'+lastTask+'"/>'+
-    '<mergeCells count="'+mergeRefs.length+'">'+mergeRefs.map(x=>'<mergeCell ref="'+x+'"/>').join('')+'</mergeCells>'+
+    '<sheetPr><outlinePr summaryBelow="1" summaryRight="1"/><pageSetUpPr fitToPage="1"/></sheetPr>'+
+    '<dimension ref="A1:K'+last+'"/>'+
+    '<sheetViews><sheetView showGridLines="1" workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews>'+
+    '<sheetFormatPr defaultRowHeight="18"/>'+
+    '<cols>'+cols+'</cols>'+
+    '<sheetData>'+xml+'</sheetData>'+
+    '<autoFilter ref="A1:K'+last+'"/>'+
     '<pageMargins left="0.25" right="0.25" top="0.5" bottom="0.5" header="0.2" footer="0.2"/>'+
     '<pageSetup orientation="landscape" paperSize="9" fitToHeight="0" fitToWidth="1"/>'+
     '</worksheet>';
-
+  const wb='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><bookViews><workbookView/></bookViews><sheets><sheet name="Task Report" sheetId="1" r:id="rId1"/></sheets></workbook>';
+  const rels='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml" Id="rId1"/><Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml" Id="rId2"/><Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme" Target="theme/theme1.xml" Id="rId3"/></Relationships>';
+  const root='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml" Id="rId1"/><Relationship Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml" Id="rId2"/><Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties" Target="docProps/app.xml" Id="rId3"/></Relationships>';
+  const core='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:creator>Task Command</dc:creator><dc:title>Task Performance Report</dc:title></cp:coreProperties>';
+  const app='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties"><Application>Task Command</Application></Properties>';
   return _zipStore([
-    {name:'[Content_Types].xml',data:_XLSX_STATIC.contentTypes},
-    {name:'_rels/.rels',data:_XLSX_STATIC.rootRels},
-    {name:'xl/workbook.xml',data:_XLSX_STATIC.workbook},
-    {name:'xl/_rels/workbook.xml.rels',data:_XLSX_STATIC.workbookRels},
-    {name:'xl/worksheets/sheet1.xml',data:sheet},
-    {name:'xl/styles.xml',data:_XLSX_STATIC.styles},
-    {name:'xl/theme/theme1.xml',data:_XLSX_STATIC.theme},
-    {name:'docProps/core.xml',data:_XLSX_STATIC.core},
-    {name:'docProps/app.xml',data:_XLSX_STATIC.app}
+    {name:'[Content_Types].xml',data:_XLSX_CT},{name:'_rels/.rels',data:root},{name:'xl/workbook.xml',data:wb},
+    {name:'xl/_rels/workbook.xml.rels',data:rels},{name:'xl/worksheets/sheet1.xml',data:sheet},
+    {name:'xl/styles.xml',data:_XLSX_TABLE_STYLES},{name:'xl/theme/theme1.xml',data:_XLSX_THEME},
+    {name:'docProps/core.xml',data:core},{name:'docProps/app.xml',data:app}
   ]);
 }
 /* ---------- Reference-matched PDF ---------- */
