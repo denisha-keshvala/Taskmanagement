@@ -560,7 +560,7 @@ async function login(){
 window.handleLogin = login;
 
 function startSession(m){APP.currentUser=m;APP.filter=isOwner(m)?'all':'my';localStorage.setItem('taskCommandUserId',m.employeeId||'');if(APP.sessionToken)localStorage.setItem('taskCommandSession',APP.sessionToken);document.getElementById('loginScreen').style.display='none';document.getElementById('appDashboard').style.display='flex';applyRoleUI();updateProfileUI();renderAll();loadDirectAnnouncements().then(renderAnnouncements).catch(()=>{});startLiveRefresh();document.getElementById('currentPageTitle').textContent=isOwner(m)?'Dashboard':'My Tasks';document.getElementById('taskTableHeading').textContent=isOwner(m)?'Live Task List':'My Tasks';toast('Welcome, '+m.name)}
-function applyRoleUI(){const owner=isOwner();document.querySelectorAll('.owner-only').forEach(el=>el.classList.toggle('hidden-by-role',!owner));document.querySelectorAll('.photo-upload-overlay').forEach(el=>el.style.display='flex');const dash=document.getElementById('dashboardNav');if(dash)dash.classList.toggle('hidden-by-role',!owner);}
+function applyRoleUI(){const owner=isOwner();document.querySelectorAll('.owner-only,.admin-only,.owner-only-page').forEach(el=>el.classList.toggle('hidden-by-role',!owner));document.querySelectorAll('.photo-upload-overlay').forEach(el=>el.style.display='flex');const dash=document.getElementById('dashboardNav');if(dash)dash.classList.toggle('hidden-by-role',!owner);if(!owner&&document.getElementById('add-member-page')?.classList.contains('active'))showPage('dashboard-page');}
 function logout(){stopLiveRefresh();localStorage.removeItem('taskCommandUserId');localStorage.removeItem('taskCommandSession');APP.currentUser=null;APP.sessionToken='';document.getElementById('appDashboard').style.display='none';document.getElementById('loginScreen').style.display='flex';document.getElementById('loginEmployeeId').value='';document.getElementById('loginPassword').value='';document.getElementById('loginDepartmentSelect').value=''}
 function showLoginError(msg){const e=document.getElementById('loginError');e.textContent=msg;e.style.display='block'}
 async function loadData(silent=false){if(!APP.currentUser||isLoading)return;isLoading=true;try{const data=await direct('getData',{employeeId:APP.currentUser.employeeId});APP={...APP,...data};APP.currentUser=data.currentUser||APP.currentUser;await loadDirectAnnouncements();applyRoleUI();renderAll();updateProfileUI();if(!silent)toast('Data refreshed')}catch(e){if(!silent)toast(e.message||e)}finally{isLoading=false}}
@@ -781,6 +781,10 @@ async function deleteMember(i){
 function renderNotifications(){const list=APP.notifications?.[APP.currentUser?.name]||[];const unread=list.filter(x=>!x.read).length;const count=document.getElementById('notifCount');const box=document.getElementById('notifList');if(count)count.textContent=unread;if(!box)return;box.innerHTML=list.length?list.slice(0,25).map((n,i)=>`<div class="notif-item ${n.read?'':'notif-unread'}" onclick="openNotificationDetails(${i})"><b>${escapeHtml(n.title||n.type||'Update')}</b>${n.message?` — ${escapeHtml(n.message)}`:''}<br><small style="color:var(--text-muted)">${n.createdAt?new Date(n.createdAt).toLocaleString():''}</small></div>`).join(''):'<p style="font-size:.75rem;color:var(--text-muted);text-align:center;padding:10px">No new notifications</p>'}
 function toggleNotificationDropdown(){const box=document.getElementById('notifDropdown');if(!box)return;box.classList.toggle('show');renderNotifications()}
 function openNotificationDetails(i){const list=APP.notifications?.[APP.currentUser?.name]||[];const n=list[i];if(!n)return;n.read=true;renderNotifications();if(n.id){supabaseClient.from('notifications').update({is_read:true}).eq('id',n.id).then(()=>{}).catch(()=>{})}toast((n.title||n.type||'Notification')+': '+(n.message||''))}
+function openAnnouncementComposer(){if(!isOwner()){toast('Only Owner can publish announcements.');return}document.getElementById('announcementComposer')?.classList.add('show')}
+function closeAnnouncementComposer(){document.getElementById('announcementComposer')?.classList.remove('show')}
+function selectAnnouncementType(btn,type){const input=document.getElementById('annCategory');if(input)input.value=type;document.querySelectorAll('.tc-ann-types button').forEach(x=>x.classList.remove('active'));btn?.classList.add('active')}
+window.openAnnouncementComposer=openAnnouncementComposer;window.closeAnnouncementComposer=closeAnnouncementComposer;window.selectAnnouncementType=selectAnnouncementType;
 function renderAnnouncements(){const list=APP.announcements||[];const el=document.getElementById('announcementList');if(!el)return;if(!list.length){el.innerHTML='<div class="announcement-empty">No announcements yet. Stay tuned for company updates.</div>';return}el.innerHTML=list.map((a,i)=>`<div class="announcement-card" onclick="openAnnouncementDetails(${i})"><div class="ann-type">${escapeHtml(a.type||'Announcement')} • ${escapeHtml(a.createdByName||'Admin')}</div><h4>${escapeHtml(a.title)}</h4><div class="ann-desc">${safeRich(a.description)}</div><small>${a.createdAt?new Date(a.createdAt).toLocaleString():''}${a.fileUrl?` • <a href="${escapeHtml(a.fileUrl)}" target="_blank" onclick="event.stopPropagation()" style="color:#fff;text-decoration:underline">${escapeHtml(a.fileName||'Attachment')}</a>`:''}</small></div>`).join('')}
 function openAnnouncementDetails(i){const a=(APP.announcements||[])[i];if(!a)return;ensureFeatureUI();document.getElementById('announcementDetailType').textContent=(a.type||'Announcement')+' • '+(a.createdByName||'Admin');document.getElementById('announcementDetailTitle').textContent=a.title||'Announcement';document.getElementById('announcementDetailAuthor').textContent=a.createdByName||'Admin';document.getElementById('announcementDetailDate').textContent=a.createdAt?new Date(a.createdAt).toLocaleString():'—';document.getElementById('announcementDetailDescription').innerHTML=safeRich(a.description||'');const file=document.getElementById('announcementDetailFile');if(a.fileUrl){file.href=a.fileUrl;file.style.display='block'}else{file.style.display='none';file.removeAttribute('href')}document.getElementById('announcementDetailsModal').classList.add('show')}
 function closeAnnouncementDetails(){document.getElementById('announcementDetailsModal')?.classList.remove('show')}
@@ -806,6 +810,35 @@ document.addEventListener('keydown',e=>{if(e.key==='Enter'&&(document.activeElem
 window.addEventListener('load',init);
 
 document.addEventListener('click',function(e){const wrap=document.getElementById('multiAssignee');if(wrap&&!wrap.contains(e.target))closeAssigneePicker();});
+
+// ---- Stable announcement + report page actions ----
+function announcementCmd(cmd){document.execCommand(cmd,false,null);document.getElementById('annDescription')?.focus()}
+function announcementFontSize(size){if(size)document.execCommand('fontSize',false,size);document.getElementById('annDescription')?.focus()}
+async function createAnnouncement(e){
+  e.preventDefault(); if(!isOwner()){toast('Only Owner can publish announcements.');return}
+  const title=document.getElementById('annTitle')?.value.trim()||'';
+  const description=document.getElementById('annDescription')?.innerHTML.trim()||'';
+  const type=document.getElementById('annCategory')?.value||'General Announcement';
+  if(!title||!description){toast('Please add title and description.');return}
+  try{let fileUrl='';const f=document.getElementById('annFile')?.files?.[0];if(f)fileUrl=await uploadFile(f,'uploadAnnouncementFile');
+    await api('createAnnouncement',{employeeId:APP.currentUser.employeeId,sessionToken:getSessionToken(),title,description,type,fileUrl});
+    document.getElementById('annTitle').value='';document.getElementById('annDescription').innerHTML='';if(document.getElementById('annFile'))document.getElementById('annFile').value='';
+    closeAnnouncementComposer();await loadData(true);toast('Announcement published successfully');
+  }catch(err){toast(err.message||String(err))}
+}
+function getReportPreviewTasks(){
+  let tasks=Array.isArray(APP.tasks)?APP.tasks.slice():[];const emp=document.getElementById('reportEmployee')?.value||'ALL';const period=(document.getElementById('reportPeriod')?.value||'all').toLowerCase();
+  if(!isOwner()){tasks=tasks.filter(t=>taskAssignedToMe(t,APP.currentUser?.name||''));}
+  else if(emp&&emp!=='ALL')tasks=tasks.filter(t=>taskAssignedToMe(t,emp));
+  let from=null,to=null,now=new Date();if(period==='daily'){from=new Date(now.getFullYear(),now.getMonth(),now.getDate());to=new Date(from);to.setDate(to.getDate()+1)}else if(period==='weekly'){from=new Date(now);from.setHours(0,0,0,0);let d=from.getDay();from.setDate(from.getDate()-(d===0?6:d-1));to=new Date(from);to.setDate(to.getDate()+7)}else if(period==='monthly'){from=new Date(now.getFullYear(),now.getMonth(),1);to=new Date(now.getFullYear(),now.getMonth()+1,1)}else if(period==='custom'){const a=document.getElementById('reportFrom')?.value,b=document.getElementById('reportTo')?.value;if(a)from=new Date(a+'T00:00:00');if(b)to=new Date(b+'T23:59:59')}
+  if(from||to)tasks=tasks.filter(t=>{const d=new Date(t.createdAt||t.created_at||t.deadline||0);return !isNaN(d)&&(!from||d>=from)&&(!to||d<=to)});return tasks;
+}
+function renderReport(){const tasks=getReportPreviewTasks();const body=document.getElementById('reportTable');if(body)body.innerHTML=tasks.map(t=>`<tr><td>${escapeHtml(t.id||'')}</td><td>${escapeHtml(t.taskType||t.task_type||'')}</td><td>${escapeHtml(t.assignedTo||t.assigned_to||'')}</td><td>${escapeHtml(normalizeTaskStatus(t.status))}</td><td>${escapeHtml(t.priority||'Medium')}</td><td>${escapeHtml(t.deadline||'')}</td><td>${escapeHtml(t.createdAt||t.created_at||'')}</td></tr>`).join('')||'<tr><td colspan="7" style="text-align:center;padding:24px;color:#72809b">No tasks match this filter.</td></tr>';const n=x=>tasks.filter(t=>normalizeTaskStatus(t.status)===x).length;[['reportTotal',tasks.length],['reportPending',n('Pending')],['reportProgress',n('In Progress')],['reportCompleted',n('Completed')]].forEach(([id,v])=>{const e=document.getElementById(id);if(e)e.textContent=v});}
+function renderReportSummary(){try{renderReport()}catch(e){console.warn('REPORT SUMMARY',e)}}
+function exportPDF(){return window.downloadTaskReport?.('pdf')}
+function exportExcel(){return window.downloadTaskReport?.('excel')}
+window.createAnnouncement=createAnnouncement;window.announcementCmd=announcementCmd;window.announcementFontSize=announcementFontSize;window.renderReport=renderReport;window.renderReportSummary=renderReportSummary;window.exportPDF=exportPDF;window.exportExcel=exportExcel;
+
 /* =========================================================
    TASK COMMAND — PREMIUM REPORT EXPORT V4
    PDF + Excel use the same visual structure as the supplied
@@ -835,8 +868,8 @@ function _rFilter(){
   let tasks=Array.isArray(APP.tasks)?APP.tasks.slice():[];
   const empEl=document.getElementById('reportEmployee');
   const periodEl=document.getElementById('reportPeriod');
-  const startEl=document.getElementById('reportStartDate')||document.getElementById('reportStart');
-  const endEl=document.getElementById('reportEndDate')||document.getElementById('reportEnd');
+  const startEl=document.getElementById('reportFrom')||document.getElementById('reportStartDate')||document.getElementById('reportStart');
+  const endEl=document.getElementById('reportTo')||document.getElementById('reportEndDate')||document.getElementById('reportEnd');
   const employee=isOwner()?String(empEl?.value||'ALL'):(APP.currentUser?.name||'');
   const period=_rNorm(periodEl?.value||'all');
   const startVal=startEl?.value||'';
@@ -1263,3 +1296,9 @@ const oldLoadData=window.loadData;
 if(typeof oldLoadData==='function')window.loadData=async function(){const r=await oldLoadData.apply(this,arguments);try{addChatNav();if(document.getElementById('tcChatPage')?.classList.contains('tc-chat-active'))loadConversations();}catch(_){}return r;};
 
 })();
+
+// Report page visual behavior
+(function(){const old=window.updateReportDates;window.updateReportDates=function(){const r=old&&old.apply(this,arguments);const p=document.getElementById('reportPeriod');document.getElementById('tcCustomDates')?.classList.toggle('show',p?.value==='custom');try{renderReport()}catch(_){}return r};})();
+// Safe profile photo picker used by header/sidebar camera buttons.
+function openProfilePhotoPicker(){document.getElementById('profilePhotoInput')?.click()}
+window.openProfilePhotoPicker=openProfilePhotoPicker;
