@@ -584,6 +584,15 @@
 .stats-grid+.card{margin-top:0}.report-controls{display:flex;gap:10px;align-items:end;flex-wrap:wrap}.report-controls .form-group{min-width:150px}.notice-box{background:#eef5ff;color:#244a9b;padding:11px;border-radius:10px;font-size:12px;margin-bottom:14px}.member-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:15px}.member-tile{border:1px solid #e5e7eb;border-radius:14px;padding:16px}.member-photo{width:62px;height:62px;border-radius:50%;background:#4318ff;color:#fff;display:grid;place-items:center;font-weight:800;font-size:20px;overflow:hidden;margin-bottom:10px}.member-photo img{width:100%;height:100%;object-fit:cover}.announcement-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px}.announcement-card{background:#fff;border:1px solid #e5e7eb;border-radius:16px;padding:18px;box-shadow:0 8px 30px rgba(24,39,75,.05)}.announcement-cat{color:#6d28d9;font-size:11px;font-weight:800;text-transform:uppercase}.announcement-body{line-height:1.6;margin:11px 0}.reaction-btn{border:1px solid #e5e7eb;background:#fff;border-radius:20px;padding:7px 11px;cursor:pointer}.hidden{display:none!important}.table-scroll{overflow:auto}
 @media(max-width:900px){.stats-grid{grid-template-columns:1fr 1fr}.member-grid,.announcement-grid{grid-template-columns:1fr 1fr}.task-detail-grid{grid-template-columns:1fr 1fr}}
 @media(max-width:600px){.stats-grid,.member-grid,.announcement-grid,.task-detail-grid{grid-template-columns:1fr}}
+
+/* FINAL DASHBOARD UX PATCH */
+.hidden-by-role{display:none!important}
+.tc-announcement-board{background:linear-gradient(110deg,#102b73,#244fd5);border-radius:18px;padding:14px 16px 16px;color:#fff;min-height:140px;box-shadow:0 12px 32px rgba(22,58,145,.15)}
+.tc-announcement-board-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}.tc-announcement-board-head h3{margin:0;font-size:16px}.tc-post-btn{border:1px solid rgba(255,255,255,.35);background:rgba(255,255,255,.1);color:#fff;border-radius:9px;padding:8px 14px;font-weight:800;cursor:pointer}
+#announcements-page .announcement-grid{display:flex;gap:10px;overflow:auto}.tc-announcement-board .announcement-card{min-width:220px;max-width:300px;background:rgba(255,255,255,.10)!important;border:1px solid rgba(255,255,255,.20)!important;color:#fff!important;border-radius:12px!important;padding:12px!important;box-shadow:none!important}.tc-announcement-board .announcement-card h4{margin:5px 0}.tc-announcement-board .ann-type,.tc-announcement-board .announcement-card small{color:#d9e5ff!important}.tc-announcement-board .ann-desc{font-size:12px;max-height:42px;overflow:hidden}.tc-announcement-board .announcement-card:after{display:none!important}
+.tc-compose-modal{position:fixed;inset:0;background:rgba(7,20,52,.55);display:none;align-items:center;justify-content:center;z-index:11000;padding:16px}.tc-compose-modal.show{display:flex}.tc-compose-card{width:min(720px,96vw);max-height:94vh;overflow:auto;background:#fff;border-radius:22px;box-shadow:0 30px 90px rgba(0,0,0,.3)}.tc-compose-top{height:112px;background:linear-gradient(120deg,#102d78,#5036ff)}.tc-compose-body{position:relative;padding:28px}.tc-compose-body h2{margin:8px 0 2px}.tc-compose-body>p{color:#72809b;margin:0 0 20px}.tc-compose-close{position:absolute;right:22px;top:20px;border:0;width:38px;height:38px;border-radius:50%;font-size:25px;background:#f2f5fa;cursor:pointer}.tc-ann-types{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 14px}.tc-ann-types button{border:1px solid #dbe3f1;background:#fff;border-radius:9px;padding:8px 13px;cursor:pointer}.tc-ann-types button.active{border-color:#4a32ff;color:#4a32ff;background:#f4f1ff}.tc-compose-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px}.tc-compose-actions>button{border:0;border-radius:10px;padding:12px;font-weight:800;cursor:pointer}.tc-compose-actions>button:first-child{background:#f2f5fa;color:#1e293b}
+.tc-report-wrap{background:#fff;border-radius:16px;padding:20px;box-shadow:0 8px 25px rgba(24,39,75,.06)}.tc-report-title h2{margin:0;font-size:25px}.tc-report-title p{margin:4px 0 15px;color:#72809b}.tc-smart-export{border:1px solid #d8e2ff;background:linear-gradient(110deg,#f4f8ff,#f5f2ff);border-radius:22px;padding:18px}.tc-smart-head{display:flex;align-items:center;gap:12px;margin-bottom:16px}.tc-smart-icon{width:48px;height:48px;border-radius:14px;background:linear-gradient(135deg,#168cff,#4a3cff);color:#fff;display:grid;place-items:center;font-size:21px}.tc-smart-head h3{margin:0}.tc-smart-head p{margin:3px 0 0;color:#72809b;font-size:12px}.tc-report-controls{display:grid;grid-template-columns:minmax(180px,1.3fr) minmax(180px,1fr) auto auto;gap:10px;align-items:end}.tc-export-btn{height:45px;border:0;border-radius:11px;color:#fff;padding:0 18px;font-weight:900;cursor:pointer;font-size:14px}.tc-export-btn.pdf{background:#e42d2d}.tc-export-btn.excel{background:#079447}.tc-report-note{border:1px solid #d8e2ff;background:#fff;border-radius:11px;padding:9px 12px;color:#53698f;font-size:11px;margin-top:12px}.tc-report-pills{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}.tc-report-pills span{background:#fff;border:1px solid #d7e0f1;border-radius:10px;padding:8px 12px;font-size:12px;font-weight:700}.tc-custom-dates{display:none;gap:10px;align-items:end;margin-top:12px}.tc-custom-dates.show{display:flex}.tc-report-preview{margin-top:16px}
+@media(max-width:900px){.tc-report-controls{grid-template-columns:1fr 1fr}.tc-export-btn{width:100%}}@media(max-width:600px){.tc-report-controls{grid-template-columns:1fr}.tc-compose-actions{grid-template-columns:1fr}.tc-custom-dates{flex-direction:column;align-items:stretch}}
 </style>
 
 <style id="dynamic-employee-profile-css">
@@ -688,10 +697,8 @@
         <li class="nav-item active" onclick="switchTaskFilter('all','Dashboard',this)"><i class="fas fa-home"></i> Dashboard</li>
         <li class="nav-item" onclick="switchTaskFilter('my','My Tasks',this)"><i class="fas fa-list-check"></i> My Tasks</li>
         <li class="nav-item admin-only" onclick="switchTaskFilter('all','All Tasks',this)"><i class="fas fa-layer-group"></i> All Tasks</li>
-        <li class="nav-item" onclick="switchTaskFilter('in-progress','In Progress',this)"><i class="fas fa-clock"></i> In Progress</li>
-        <li class="nav-item" onclick="switchTaskFilter('completed','Completed',this)"><i class="fas fa-circle-check"></i> Completed</li>
         <li class="nav-item admin-only" onclick="switchPage('assign-task-page','Assign Task',this)"><i class="fas fa-plus-circle"></i> Assign Task</li>
-        <li class="nav-item admin-only" onclick="switchPage('add-member-page','Manage Members',this)"><i class="fas fa-users"></i> Manage Members</li>
+        <li class="nav-item owner-only" onclick="switchPage('add-member-page','Manage Members',this)"><i class="fas fa-users"></i> Manage Members</li>
         <li class="nav-item owner-only" onclick="switchPage('team-page','Team Members',this)"><i class="fas fa-people-group"></i> Team Members</li>
         <li class="nav-item" onclick="switchPage('announcements-page','Announcements',this)"><i class="fas fa-bullhorn"></i> Announcements</li>
         <li class="nav-item" onclick="switchPage('reports-page','Reports',this)"><i class="fas fa-chart-column"></i> Reports</li>
@@ -949,59 +956,63 @@
 
         <!-- ANNOUNCEMENTS -->
         <div id="announcements-page" class="modal-page">
-          <div class="card admin-only">
-            <div class="card-header"><h2><i class="fas fa-bullhorn"></i> Create Announcement</h2></div>
-            <form onsubmit="createAnnouncement(event)">
-              <div class="grid-2">
-                <div class="form-group"><label>Title</label><input id="annTitle" required></div>
-                <div class="form-group"><label>Category</label>
-                  <select id="annCategory">
-                    <option>General Announcement</option><option>Company Event</option><option>Birthday</option>
-                    <option>Exhibition</option><option>Meeting</option><option>Company News</option>
-                    <option>Achievement</option><option>Important Notice</option><option>Other</option>
-                  </select>
-                </div>
+          <section class="tc-announcement-board">
+            <div class="tc-announcement-board-head">
+              <h3><i class="fas fa-bullhorn"></i> Company Updates &amp; Announcements</h3>
+              <button type="button" class="tc-post-btn owner-only" onclick="openAnnouncementComposer()">+ Post</button>
+            </div>
+            <div class="announcement-grid" id="announcementList"></div>
+          </section>
+          <div class="tc-compose-modal" id="announcementComposer" onclick="if(event.target===this)closeAnnouncementComposer()">
+            <div class="tc-compose-card">
+              <div class="tc-compose-top"></div>
+              <div class="tc-compose-body">
+                <button type="button" class="tc-compose-close" onclick="closeAnnouncementComposer()">×</button>
+                <h2>Create Announcement</h2>
+                <p>Share appreciation, birthday wishes, events, tours, games or important instructions.</p>
+                <form onsubmit="createAnnouncement(event)">
+                  <div class="form-group"><label>Announcement Title</label><input id="annTitle" placeholder="e.g. Great work team! 🎉" required></div>
+                  <input type="hidden" id="annCategory" value="General Announcement">
+                  <div class="tc-ann-types">
+                    <button type="button" class="active" data-ann-type="General Announcement" onclick="selectAnnouncementType(this,'General Announcement')">📣 Announcement</button>
+                    <button type="button" data-ann-type="Appreciation" onclick="selectAnnouncementType(this,'Appreciation')">🏆 Appreciation</button>
+                    <button type="button" data-ann-type="Birthday" onclick="selectAnnouncementType(this,'Birthday')">🎂 Birthday</button>
+                    <button type="button" data-ann-type="Company Event" onclick="selectAnnouncementType(this,'Company Event')">🎉 Event</button>
+                    <button type="button" data-ann-type="Tour" onclick="selectAnnouncementType(this,'Tour')">🚌 Tour</button>
+                    <button type="button" data-ann-type="Game" onclick="selectAnnouncementType(this,'Game')">🎮 Game</button>
+                    <button type="button" data-ann-type="Important Notice" onclick="selectAnnouncementType(this,'Important Notice')">📌 Instruction</button>
+                  </div>
+                  <div class="form-group"><label>Description / Instructions</label>
+                    <div class="editor-toolbar"><button type="button" onclick="announcementCmd('bold')"><i class="fas fa-bold"></i></button><button type="button" onclick="announcementCmd('italic')"><i class="fas fa-italic"></i></button><button type="button" onclick="announcementCmd('underline')"><i class="fas fa-underline"></i></button></div>
+                    <div class="editor-content" id="annDescription" contenteditable="true"></div>
+                  </div>
+                  <div class="form-group"><label><i class="fas fa-paperclip"></i> Add File</label><input type="file" id="annFile" accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt"></div>
+                  <div class="tc-compose-actions"><button type="button" onclick="closeAnnouncementComposer()">Cancel</button><button class="btn-primary" type="submit">Publish Announcement</button></div>
+                </form>
               </div>
-              <div class="form-group"><label>Rich Description</label>
-                <div class="editor-toolbar">
-                  <button type="button" onclick="announcementCmd('bold')"><i class="fas fa-bold"></i></button>
-                  <button type="button" onclick="announcementCmd('italic')"><i class="fas fa-italic"></i></button>
-                  <button type="button" onclick="announcementCmd('underline')"><i class="fas fa-underline"></i></button>
-                  <select onchange="announcementFontSize(this.value)"><option value="">Font size</option><option value="2">Small</option><option value="3">Normal</option><option value="5">Large</option><option value="7">Huge</option></select>
-                </div>
-                <div class="editor-content" id="annDescription" contenteditable="true"></div>
-              </div>
-              <div class="form-group"><label>File / Image Attachment</label><input type="file" id="annFile" accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt"></div>
-              <button class="btn-primary" type="submit"><i class="fas fa-paper-plane"></i> Publish Announcement</button>
-            </form>
+            </div>
           </div>
-          <div class="announcement-grid" id="announcementList"></div>
         </div>
 
         <!-- REPORTS -->
         <div id="reports-page" class="modal-page">
-          <div class="card">
-            <div class="card-header"><h2><i class="fas fa-chart-column"></i> Reports</h2></div>
-            <div class="notice-box">Choose a period, filter the data, then export the same report to Excel or print it to PDF.</div>
-            <div class="report-controls">
-              <div class="form-group"><label>Period</label><select id="reportPeriod" onchange="updateReportDates()"><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="monthly" selected>Monthly</option><option value="custom">Custom</option></select></div>
-              <div class="form-group"><label>From</label><input type="date" id="reportFrom"></div>
-              <div class="form-group"><label>To</label><input type="date" id="reportTo"></div>
-              <div class="form-group owner-only"><label>Employee</label><select id="reportEmployee"></select></div>
-              <button class="btn-primary" onclick="renderReport()"><i class="fas fa-filter"></i> Apply</button>
-              <button class="btn-primary" onclick="exportExcel()"><i class="fas fa-file-excel"></i> Excel</button>
-              <button class="btn-primary" onclick="exportPDF()"><i class="fas fa-file-pdf"></i> PDF</button>
+          <div class="tc-report-wrap">
+            <div class="tc-report-title"><h2><i class="fas fa-chart-column"></i> Reports &amp; Export</h2><p>Export daily, weekly, monthly or all task data as PDF/Excel.</p></div>
+            <div class="tc-smart-export">
+              <div class="tc-smart-head"><div class="tc-smart-icon"><i class="fas fa-chart-pie"></i></div><div><h3>Smart Task Export</h3><p>Download the same task data in a clean, dashboard-style report.</p></div></div>
+              <div class="tc-report-controls">
+                <div class="form-group"><label>Employee</label><select id="reportEmployee"></select></div>
+                <div class="form-group"><label>Period</label><select id="reportPeriod" onchange="updateReportDates()"><option value="all">All Time</option><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option><option value="custom">Custom</option></select></div>
+                <button class="tc-export-btn pdf" onclick="exportPDF()"><i class="fas fa-file-pdf"></i> PDF Report</button>
+                <button class="tc-export-btn excel" onclick="exportExcel()"><i class="fas fa-file-excel"></i> Styled Excel</button>
+              </div>
+              <div id="tcCustomDates" class="tc-custom-dates"><div class="form-group"><label>From</label><input type="date" id="reportFrom"></div><div class="form-group"><label>To</label><input type="date" id="reportTo"></div><button class="btn-primary" onclick="renderReport()"><i class="fas fa-filter"></i> Apply</button></div>
+              <div class="tc-report-note"><i class="fas fa-circle-info"></i> PDF and Excel keep the TASK COMMAND visual style and use the currently selected employee and period.</div>
+              <div class="tc-report-pills"><span>Total: <b id="reportTotal">0</b></span><span>Pending: <b id="reportPending">0</b></span><span>In Progress: <b id="reportProgress">0</b></span><span>Completed: <b id="reportCompleted">0</b></span></div>
             </div>
+            <div class="card tc-report-preview"><div class="table-scroll"><table><thead><tr><th>ID</th><th>Task</th><th>Assigned To</th><th>Status</th><th>Priority</th><th>Deadline</th><th>Created</th></tr></thead><tbody id="reportTable"></tbody></table></div></div>
           </div>
-          <div class="stats-grid">
-            <div class="stat-card"><strong id="reportTotal">0</strong><span>Total</span></div>
-            <div class="stat-card"><strong id="reportPending">0</strong><span>Pending</span></div>
-            <div class="stat-card"><strong id="reportProgress">0</strong><span>In Progress</span></div>
-            <div class="stat-card"><strong id="reportCompleted">0</strong><span>Completed</span></div>
-          </div>
-          <div class="card"><div class="table-scroll"><table><thead><tr><th>ID</th><th>Task</th><th>Assigned To</th><th>Status</th><th>Priority</th><th>Deadline</th><th>Created</th></tr></thead><tbody id="reportTable"></tbody></table></div></div>
         </div>
-
       </div>
     </div>
   </div>
