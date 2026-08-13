@@ -943,7 +943,7 @@ function _zip(files){
 }
 
 function _xlsxXml(rows){
-  const headers=['Task ID','Task Type','Department','Assigned To','Assigned By','Priority','Deadline','Status'];
+  const headers=['TASK ID','TASK TYPE','DEPARTMENT','ASSIGNED TO','ASSIGNED BY','PRIORITY','DEADLINE','STATUS'];
   const esc=_reportEsc;
   const total=rows.length;
   const completed=rows.filter(r=>String(r[7]||'').toLowerCase()==='completed').length;
@@ -954,47 +954,54 @@ function _xlsxXml(rows){
   const period=String(meta.period||'all').toUpperCase();
   const generated=new Date().toLocaleString();
 
-  function cell(v,style){return '<c s="'+(style||0)+'" t="inlineStr"><is><t>'+esc(v)+'</t></is></c>';}
-  function row(r,style,ht){return '<row r="'+r+'" ht="'+(ht||22)+'">'+style+'</row>';}
-  function cells(values,style){return values.map(v=>cell(v,style)).join('');}
-
-  let sheetRows='';
-  sheetRows+=row(1,cells(['TASK COMMAND'],3),30);
-  sheetRows+=row(2,cells(['TASK PERFORMANCE REPORT'],4),24);
-  sheetRows+=row(3,cells(['Employee: '+employee+'   |   Period: '+period+'   |   Generated: '+generated],5),22);
-  sheetRows+=row(4,cells(['TOTAL TASKS','COMPLETED','PENDING','IN PROGRESS'],1),22);
-  sheetRows+=row(5,cells([total,completed,pending,progress],6),34);
-  sheetRows+=row(6,cells(['','','',''],0),10);
-  sheetRows+=row(7,cells(headers,1),26);
+  function cell(ref,v,style){
+    const text=String(v==null?'':v);
+    return '<c r="'+ref+'" s="'+(style||0)+'" t="inlineStr"><is><t xml:space="preserve">'+esc(text)+'</t></is></c>';
+  }
+  function row(r,xml,ht){return '<row r="'+r+'" ht="'+(ht||22)+'" customHeight="1">'+xml+'</row>';}
+  function cells(values,style,startCol){
+    const out=[]; for(let i=0;i<values.length;i++){
+      const n=(startCol||0)+i; let x=n, letters='';
+      do{letters=String.fromCharCode(65+(x%26))+letters;x=Math.floor(x/26)-1;}while(x>=0);
+      out.push(cell(letters+(style?currentRow:currentRow),values[i],style));
+    } return out.join('');
+  }
+  let currentRow=1, sheetRows='';
+  sheetRows+=row(currentRow++,cell('A1','TASK COMMAND',3),32);
+  sheetRows+=row(currentRow++,cell('A2','TASK PERFORMANCE REPORT',4),25);
+  sheetRows+=row(currentRow++,cell('A3','Employee: '+employee+'   |   Period: '+period+'   |   Generated: '+generated,5),22);
+  sheetRows+=row(currentRow++,cell('A4','TOTAL TASKS',1)+cell('C4','COMPLETED',1)+cell('E4','PENDING',1)+cell('G4','IN PROGRESS',1),22);
+  sheetRows+=row(currentRow++,cell('A5',total,6)+cell('C5',completed,7)+cell('E5',pending,8)+cell('G5',progress,9),36);
+  sheetRows+=row(currentRow++,cell('A6','',0),10);
+  sheetRows+=row(currentRow++,headers.map((v,i)=>cell(String.fromCharCode(65+i)+'7',v,1)).join(''),28);
   rows.forEach((r,i)=>{
-    const vals=r.slice(0,8);
-    const style=(i%2===0)?2:7;
-    sheetRows+=row(8+i,cells(vals,style),30);
+    const vals=r.slice(0,8), style=(i%2===0)?2:10, rr=8+i;
+    sheetRows+=row(rr,vals.map((v,j)=>cell(String.fromCharCode(65+j)+rr,v,style)).join(''),34);
   });
   const footerRow=8+rows.length;
-  sheetRows+=row(footerRow,cells(['TASK COMMAND  |  Centralized Team Management  |  '+total+' task(s) in this report'],5),24);
+  sheetRows+=row(footerRow,cell('A'+footerRow,'TASK COMMAND  |  Centralized Team Management  |  '+total+' task(s) in this report',5),24);
 
   const styles='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
     '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'+
-    '<numFmts count="0"/>'+ 
     '<fonts count="8">'+
       '<font><sz val="11"/><color rgb="FF0F172A"/><name val="Aptos"/></font>'+
       '<font><b/><sz val="10"/><color rgb="FFFFFFFF"/><name val="Aptos"/></font>'+
       '<font><sz val="10"/><color rgb="FF0F172A"/><name val="Aptos"/></font>'+
-      '<font><b/><sz val="22"/><color rgb="FF173B8F"/><name val="Aptos Display"/></font>'+
-      '<font><b/><sz val="15"/><color rgb="FF633BFF"/><name val="Aptos Display"/></font>'+
+      '<font><b/><sz val="24"/><color rgb="FF173B8F"/><name val="Aptos Display"/></font>'+
+      '<font><b/><sz val="16"/><color rgb="FF633BFF"/><name val="Aptos Display"/></font>'+
       '<font><b/><sz val="9"/><color rgb="FF64748B"/><name val="Aptos"/></font>'+
-      '<font><b/><sz val="18"/><color rgb="FF173B8F"/><name val="Aptos"/></font>'+
-      '<font><b/><sz val="10"/><color rgb="FF0F172A"/><name val="Aptos"/></font>'+
+      '<font><b/><sz val="20"/><color rgb="FF173B8F"/><name val="Aptos"/></font>'+
+      '<font><b/><sz val="20"/><color rgb="FF173B8F"/><name val="Aptos"/></font>'+
     '</fonts>'+
-    '<fills count="8">'+
+    '<fills count="9">'+
       '<fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill>'+
       '<fill><patternFill patternType="solid"><fgColor rgb="FF173B8F"/><bgColor indexed="64"/></patternFill></fill>'+
       '<fill><patternFill patternType="solid"><fgColor rgb="FFFFFFFF"/><bgColor indexed="64"/></patternFill></fill>'+
       '<fill><patternFill patternType="solid"><fgColor rgb="FF633BFF"/><bgColor indexed="64"/></patternFill></fill>'+
       '<fill><patternFill patternType="solid"><fgColor rgb="FFF8FAFC"/><bgColor indexed="64"/></patternFill></fill>'+
-      '<fill><patternFill patternType="solid"><fgColor rgb="FFEAF2FF"/><bgColor indexed="64"/></patternFill></fill>'+
-      '<fill><patternFill patternType="solid"><fgColor rgb="FFF5F8FC"/><bgColor indexed="64"/></patternFill></fill>'+
+      '<fill><patternFill patternType="solid"><fgColor rgb="FFE8F1FF"/><bgColor indexed="64"/></patternFill></fill>'+
+      '<fill><patternFill patternType="solid"><fgColor rgb="FFE8F8EF"/><bgColor indexed="64"/></patternFill></fill>'+
+      '<fill><patternFill patternType="solid"><fgColor rgb="FFFFF5DE"/><bgColor indexed="64"/></patternFill></fill>'+
     '</fills>'+
     '<borders count="3">'+
       '<border><left/><right/><top/><bottom/><diagonal/></border>'+
@@ -1002,29 +1009,43 @@ function _xlsxXml(rows){
       '<border><left/><right/><top/><bottom style="thin"><color rgb="FFD5DEEE"/></bottom><diagonal/></border>'+
     '</borders>'+
     '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>'+
-    '<cellXfs count="8">'+
-      '<xf numFmtId="0" fontId="0" fillId="3" borderId="1" applyFill="1"/>'+
-      '<xf numFmtId="0" fontId="1" fillId="2" borderId="1" applyFont="1" applyFill="1"><alignment horizontal="center"/></xf>'+
-      '<xf numFmtId="0" fontId="2" fillId="3" borderId="1" applyFill="1"/>'+
-      '<xf numFmtId="0" fontId="3" fillId="3" borderId="0" applyFont="1" applyFill="1"><alignment horizontal="center"/></xf>'+
-      '<xf numFmtId="0" fontId="4" fillId="3" borderId="0" applyFont="1" applyFill="1"><alignment horizontal="center"/></xf>'+
-      '<xf numFmtId="0" fontId="5" fillId="3" borderId="0" applyFont="1" applyFill="1"><alignment horizontal="center"/></xf>'+
-      '<xf numFmtId="0" fontId="6" fillId="6" borderId="1" applyFont="1" applyFill="1"><alignment horizontal="center"/></xf>'+
-      '<xf numFmtId="0" fontId="7" fillId="7" borderId="1" applyFont="1" applyFill="1"/>'+
+    '<cellXfs count="11">'+
+      '<xf numFmtId="0" fontId="0" fillId="3" borderId="0" applyFill="1"/>'+
+      '<xf numFmtId="0" fontId="1" fillId="2" borderId="1" applyFont="1" applyFill="1"><alignment horizontal="left" vertical="center"/></xf>'+
+      '<xf numFmtId="0" fontId="2" fillId="3" borderId="1" applyFill="1"><alignment vertical="center" wrapText="1"/></xf>'+
+      '<xf numFmtId="0" fontId="3" fillId="3" borderId="0" applyFont="1" applyFill="1"><alignment horizontal="center" vertical="center"/></xf>'+
+      '<xf numFmtId="0" fontId="4" fillId="3" borderId="0" applyFont="1" applyFill="1"><alignment horizontal="center" vertical="center"/></xf>'+
+      '<xf numFmtId="0" fontId="5" fillId="3" borderId="0" applyFont="1" applyFill="1"><alignment horizontal="center" vertical="center"/></xf>'+
+      '<xf numFmtId="0" fontId="6" fillId="6" borderId="1" applyFont="1" applyFill="1"><alignment horizontal="left" vertical="center"/></xf>'+
+      '<xf numFmtId="0" fontId="7" fillId="7" borderId="1" applyFont="1" applyFill="1"><alignment horizontal="left" vertical="center"/></xf>'+ 
+      '<xf numFmtId="0" fontId="7" fillId="8" borderId="1" applyFont="1" applyFill="1"><alignment horizontal="left" vertical="center"/></xf>'+ 
+      '<xf numFmtId="0" fontId="7" fillId="6" borderId="1" applyFont="1" applyFill="1"><alignment horizontal="left" vertical="center"/></xf>'+ 
+      '<xf numFmtId="0" fontId="2" fillId="7" borderId="1" applyFill="1"><alignment vertical="center" wrapText="1"/></xf>'+ 
     '</cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>';
 
   const maxRow=Math.max(1,footerRow);
   const sheet='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
     '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'+
-    '<sheetPr><pageSetUpPr fitToPage="1"/></sheetPr><dimension ref="A1:H'+maxRow+'"/>'+ 
+    '<sheetPr><pageSetUpPr fitToPage="1"/></sheetPr>'+
+    '<dimension ref="A1:H'+maxRow+'"/>'+ 
     '<sheetViews><sheetView workbookViewId="0"><pane ySplit="7" topLeftCell="A8" activePane="bottomLeft" state="frozen"/><selection pane="bottomLeft" activeCell="A8" sqref="A8"/></sheetView></sheetViews>'+
     '<sheetFormatPr defaultRowHeight="22"/>'+ 
-    '<cols><col min="1" max="1" width="20"/><col min="2" max="2" width="32"/><col min="3" max="3" width="18"/><col min="4" max="5" width="24"/><col min="6" max="6" width="13"/><col min="7" max="7" width="15"/><col min="8" max="8" width="16"/></cols>'+
-    '<mergeCells count="4"><mergeCell ref="A1:H1"/><mergeCell ref="A2:H2"/><mergeCell ref="A3:H3"/><mergeCell ref="A6:H6"/></mergeCells>'+ 
-    '<autoFilter ref="A7:H'+(7+rows.length)+'"/><sheetData>'+sheetRows+'</sheetData></worksheet>';
+    '<cols><col min="1" max="1" width="21"/><col min="2" max="2" width="34"/><col min="3" max="3" width="18"/><col min="4" max="5" width="25"/><col min="6" max="6" width="13"/><col min="7" max="7" width="15"/><col min="8" max="8" width="17"/></cols>'+
+    '<mergeCells count="8"><mergeCell ref="A1:H1"/><mergeCell ref="A2:H2"/><mergeCell ref="A3:H3"/><mergeCell ref="A4:B4"/><mergeCell ref="C4:D4"/><mergeCell ref="E4:F4"/><mergeCell ref="G4:H4"/><mergeCell ref="A6:H6"/>'+
+    '</mergeCells>'+ 
+    '<mergeCells count="4"><mergeCell ref="A5:B5"/><mergeCell ref="C5:D5"/><mergeCell ref="E5:F5"/><mergeCell ref="G5:H5"/></mergeCells>'+ 
+    '<autoFilter ref="A7:H'+(7+rows.length)+'"/><sheetData>'+sheetRows+'</sheetData>'+ 
+    '<pageMargins left="0.25" right="0.25" top="0.5" bottom="0.5" header="0.2" footer="0.2"/>'+
+    '<pageSetup orientation="landscape" paperSize="9" fitToWidth="1" fitToHeight="0"/></worksheet>';
   const workbook='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
     '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><bookViews><workbookView/></bookViews><sheets><sheet name="Task Report" sheetId="1" r:id="rId1"/></sheets></workbook>';
-  return {contentTypes:'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>',rels:'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>',workbook:workbook,workbookrels:'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>',sheet:sheet,styles:styles};
+  return {
+    contentTypes:'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>',
+    rels:'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>',
+    workbook:workbook,
+    workbookrels:'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>',
+    sheet:sheet,styles:styles
+  };
 }
 
 function _makeXlsx(rows){const x=_xlsxXml(rows);return _zip([{name:'[Content_Types].xml',data:x.contentTypes},{name:'_rels/.rels',data:x.rels},{name:'xl/workbook.xml',data:x.workbook},{name:'xl/_rels/workbook.xml.rels',data:x.workbookrels},{name:'xl/worksheets/sheet1.xml',data:x.sheet},{name:'xl/styles.xml',data:x.styles}]);}
