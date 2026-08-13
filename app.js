@@ -1074,7 +1074,7 @@ function _makePdf(rows,f){
       _pdfRect(c,tableX,y,tableW,rowH,ri%2===0?'0.985 0.992 1.00':'0.96 0.975 0.995');
       let x=tableX;
       for(let i=0;i<8;i++){
-        const max=i===1?21:(i===0?16:17);const lines=_pdfWrap(r[i],max).slice(0,2);lines.forEach((line,li)=>_pdfText(c,'F2',7.1,x+5,y+25-li*10,line,'0.05 0.09 0.15'));
+        const max=i===1?21:(i===0?16:17);if(i!==5&&i!==7){const lines=_pdfWrap(r[i],max).slice(0,2);lines.forEach((line,li)=>_pdfText(c,'F2',7.1,x+5,y+25-li*10,line,'0.05 0.09 0.15'));}
         if(i===5||i===7){
           let fill=null;
           if(i===5)fill=_rNorm(r[i])==='high'?'0.98 0.78 0.78':'1.00 0.90 0.55';
