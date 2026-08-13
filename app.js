@@ -993,7 +993,7 @@ function _xlsxXml(rows){
       '<font><b/><sz val="20"/><color rgb="FF173B8F"/><name val="Aptos"/></font>'+
       '<font><b/><sz val="20"/><color rgb="FF173B8F"/><name val="Aptos"/></font>'+
     '</fonts>'+
-    '<fills count="9">'+
+    '<fills count="10">'+
       '<fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill>'+
       '<fill><patternFill patternType="solid"><fgColor rgb="FF173B8F"/><bgColor indexed="64"/></patternFill></fill>'+
       '<fill><patternFill patternType="solid"><fgColor rgb="FFFFFFFF"/><bgColor indexed="64"/></patternFill></fill>'+
@@ -1002,6 +1002,7 @@ function _xlsxXml(rows){
       '<fill><patternFill patternType="solid"><fgColor rgb="FFE8F1FF"/><bgColor indexed="64"/></patternFill></fill>'+
       '<fill><patternFill patternType="solid"><fgColor rgb="FFE8F8EF"/><bgColor indexed="64"/></patternFill></fill>'+
       '<fill><patternFill patternType="solid"><fgColor rgb="FFFFF5DE"/><bgColor indexed="64"/></patternFill></fill>'+
+      '<fill><patternFill patternType="solid"><fgColor rgb="FFF0EBFF"/><bgColor indexed="64"/></patternFill></fill>'+
     '</fills>'+
     '<borders count="3">'+
       '<border><left/><right/><top/><bottom/><diagonal/></border>'+
@@ -1019,8 +1020,8 @@ function _xlsxXml(rows){
       '<xf numFmtId="0" fontId="6" fillId="6" borderId="1" applyFont="1" applyFill="1"><alignment horizontal="left" vertical="center"/></xf>'+
       '<xf numFmtId="0" fontId="7" fillId="7" borderId="1" applyFont="1" applyFill="1"><alignment horizontal="left" vertical="center"/></xf>'+ 
       '<xf numFmtId="0" fontId="7" fillId="8" borderId="1" applyFont="1" applyFill="1"><alignment horizontal="left" vertical="center"/></xf>'+ 
-      '<xf numFmtId="0" fontId="7" fillId="6" borderId="1" applyFont="1" applyFill="1"><alignment horizontal="left" vertical="center"/></xf>'+ 
-      '<xf numFmtId="0" fontId="2" fillId="7" borderId="1" applyFill="1"><alignment vertical="center" wrapText="1"/></xf>'+ 
+      '<xf numFmtId="0" fontId="7" fillId="9" borderId="1" applyFont="1" applyFill="1"><alignment horizontal="left" vertical="center"/></xf>'+ 
+      '<xf numFmtId="0" fontId="2" fillId="5" borderId="1" applyFill="1"><alignment vertical="center" wrapText="1"/></xf>'+ 
     '</cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>';
 
   const maxRow=Math.max(1,footerRow);
@@ -1031,10 +1032,9 @@ function _xlsxXml(rows){
     '<sheetViews><sheetView workbookViewId="0"><pane ySplit="7" topLeftCell="A8" activePane="bottomLeft" state="frozen"/><selection pane="bottomLeft" activeCell="A8" sqref="A8"/></sheetView></sheetViews>'+
     '<sheetFormatPr defaultRowHeight="22"/>'+ 
     '<cols><col min="1" max="1" width="21"/><col min="2" max="2" width="34"/><col min="3" max="3" width="18"/><col min="4" max="5" width="25"/><col min="6" max="6" width="13"/><col min="7" max="7" width="15"/><col min="8" max="8" width="17"/></cols>'+
-    '<mergeCells count="8"><mergeCell ref="A1:H1"/><mergeCell ref="A2:H2"/><mergeCell ref="A3:H3"/><mergeCell ref="A4:B4"/><mergeCell ref="C4:D4"/><mergeCell ref="E4:F4"/><mergeCell ref="G4:H4"/><mergeCell ref="A6:H6"/>'+
-    '</mergeCells>'+ 
-    '<mergeCells count="4"><mergeCell ref="A5:B5"/><mergeCell ref="C5:D5"/><mergeCell ref="E5:F5"/><mergeCell ref="G5:H5"/></mergeCells>'+ 
-    '<autoFilter ref="A7:H'+(7+rows.length)+'"/><sheetData>'+sheetRows+'</sheetData>'+ 
+    '<mergeCells count="12"><mergeCell ref="A1:H1"/><mergeCell ref="A2:H2"/><mergeCell ref="A3:H3"/><mergeCell ref="A4:B4"/><mergeCell ref="C4:D4"/><mergeCell ref="E4:F4"/><mergeCell ref="G4:H4"/><mergeCell ref="A5:B5"/><mergeCell ref="C5:D5"/><mergeCell ref="E5:F5"/><mergeCell ref="G5:H5"/><mergeCell ref="A6:H6"/></mergeCells>'+ 
+    '<sheetData>'+sheetRows+'</sheetData>'+ 
+    '<autoFilter ref="A7:H'+(7+rows.length)+'"/>'+ 
     '<pageMargins left="0.25" right="0.25" top="0.5" bottom="0.5" header="0.2" footer="0.2"/>'+
     '<pageSetup orientation="landscape" paperSize="9" fitToWidth="1" fitToHeight="0"/></worksheet>';
   const workbook='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
@@ -1071,7 +1071,7 @@ function _makePdf(rows,f){
   const perPage=6,pageCount=Math.max(1,Math.ceil(rows.length/perPage));
   for(let pg=0;pg<pageCount;pg++){
     const slice=rows.slice(pg*perPage,(pg+1)*perPage);
-    let c='q 1 1 1 0 0 cm ';
+    let c='q 1 0 0 1 0 0 cm ';
     // White premium report canvas, matching the supplied reference image.
     c+='1 1 1 rg 0 0 '+W+' '+H+' re f ';
     // Header
