@@ -662,8 +662,9 @@
       <div class="login-box">
         <h2>Welcome Back!</h2>
         <div class="login-subtitle">Please login to continue</div>
-        <div class="form-group"><label>Your Name / Employee ID</label><input type="text" id="loginId" placeholder="Enter your ID or Name" autocomplete="username"></div>
-        <div class="form-group"><label>Password</label><input type="password" id="loginPass" value="shakti@123" autocomplete="current-password"></div>
+        <div class="form-group"><label>Your Name / Employee ID</label><input type="text" id="loginEmployeeId" placeholder="Enter your ID or Name" autocomplete="username"></div>
+        <div class="form-group"><label>Password</label><input type="password" id="loginPassword" value="shakti@123" autocomplete="current-password"></div>
+        <div class="form-group"><label>Department</label><select id="loginDepartmentSelect" style="width:100%;padding:12px;border:1px solid var(--border);border-radius:10px;background:#eaf1ff;color:#111827;font-size:15px"><option value="">Select Department</option><option value="Amazon">Amazon</option><option value="Flipkart">Flipkart</option><option value="Operations">Operations</option><option value="Sales">Sales</option><option value="HR">HR</option><option value="Other">Other</option></select></div>
         <button class="btn-primary" onclick="handleLogin()"><i class="fas fa-arrow-right-to-bracket"></i>&nbsp; LOGIN</button>
         <div class="error-msg" id="loginError">Invalid Name or Password!</div>
         <div class="login-footer">© 2026 Task Command System • Secure Workspace</div>
