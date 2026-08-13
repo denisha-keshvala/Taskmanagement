@@ -714,172 +714,125 @@ function renderAnnouncements(){const list=APP.announcements||[];const el=documen
 function openAnnouncementDetails(i){const a=(APP.announcements||[])[i];if(!a)return;ensureFeatureUI();document.getElementById('announcementDetailType').textContent=(a.type||'Announcement')+' • '+(a.createdByName||'Admin');document.getElementById('announcementDetailTitle').textContent=a.title||'Announcement';document.getElementById('announcementDetailAuthor').textContent=a.createdByName||'Admin';document.getElementById('announcementDetailDate').textContent=a.createdAt?new Date(a.createdAt).toLocaleString():'—';document.getElementById('announcementDetailDescription').innerHTML=safeRich(a.description||'');const file=document.getElementById('announcementDetailFile');if(a.fileUrl){file.href=a.fileUrl;file.style.display='block'}else{file.style.display='none';file.removeAttribute('href')}document.getElementById('announcementDetailsModal').classList.add('show')}
 function closeAnnouncementDetails(){document.getElementById('announcementDetailsModal')?.classList.remove('show')}
 
-/* ================= REPORT EXPORT FIX ================= */
-function hideCsvReportUI(){
-  try{
-    const css=document.createElement('style');
-    css.textContent=`
-      .report-csv-btn,[data-report-format="csv"],button[onclick*="downloadTaskReport('csv')"],button[onclick*='downloadTaskReport("csv")']{display:none!important}
-    `;
-    document.head.appendChild(css);
-    document.querySelectorAll('.report-btn').forEach(btn=>{
-      const txt=(btn.textContent||'').trim().toLowerCase();
-      const oc=(btn.getAttribute('onclick')||'').toLowerCase();
-      if(txt.includes('csv')||oc.includes("'csv'")||oc.includes('"csv"')) btn.remove();
-    });
-  }catch(e){console.warn('CSV UI cleanup failed',e)}
-}
-
-function ensureScript(src,id){
-  return new Promise((resolve,reject)=>{
-    if(id && document.getElementById(id)){
-      const existing=document.getElementById(id);
-      if(existing.dataset.loaded==='1') return resolve();
-      existing.addEventListener('load',()=>resolve(),{once:true});
-      existing.addEventListener('error',()=>reject(new Error('Could not load '+src)),{once:true});
-      return;
-    }
-    const script=document.createElement('script');
-    if(id)script.id=id;
-    script.src=src;
-    script.onload=()=>{script.dataset.loaded='1';resolve()};
-    script.onerror=()=>reject(new Error('Could not load report library. Check your internet connection.'));
-    document.head.appendChild(script);
-  });
-}
-
-async function ensureReportLibraries(){
-  if(!window.XLSX){
-    await ensureScript('https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js','task-command-xlsx');
-  }
-  if(!window.jspdf?.jsPDF){
-    await ensureScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js','task-command-jspdf');
-  }
-  if(window.jspdf?.jsPDF && !window.jspdf.jsPDF.prototype.autoTable){
-    try{ await ensureScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js','task-command-autotable'); }catch(e){ console.warn(e); }
-  }
-}
-
-function reportFilteredTasks(){
-  let tasks=[...(APP.tasks||[])];
-  const employeeEl=document.getElementById('reportEmployee');
-  const employee=isOwner() ? ((employeeEl?.value||'ALL')) : (APP.currentUser?.name||'');
-  const period=(document.getElementById('reportPeriod')?.value||'all').toLowerCase();
-  const startVal=document.getElementById('reportStartDate')?.value || document.getElementById('reportStart')?.value || '';
-  const endVal=document.getElementById('reportEndDate')?.value || document.getElementById('reportEnd')?.value || '';
-
-  if(employee && employee!=='ALL'){
-    const wanted=norm(employee);
-    tasks=tasks.filter(t=>{
-      const names=taskAssignedToText(t)||'';
-      return names.split(',').some(n=>norm(n)===wanted) || norm(t.assignedTo)===wanted;
-    });
-  }
-
-  const now=new Date();
-  let from=null,to=null;
-  if(period==='daily' || period==='day'){
-    from=new Date(now.getFullYear(),now.getMonth(),now.getDate());
-    to=new Date(from);to.setDate(to.getDate()+1);
-  }else if(period==='weekly' || period==='week'){
-    from=new Date(now);from.setHours(0,0,0,0);const day=from.getDay();from.setDate(from.getDate()-(day===0?6:day-1));
-    to=new Date(from);to.setDate(to.getDate()+7);
-  }else if(period==='monthly' || period==='month'){
-    from=new Date(now.getFullYear(),now.getMonth(),1);
-    to=new Date(now.getFullYear(),now.getMonth()+1,1);
-  }else if(period==='custom' && (startVal||endVal)){
-    if(startVal){from=new Date(startVal+'T00:00:00');}
-    if(endVal){to=new Date(endVal+'T23:59:59');}
-  }
-
-  if(from || to){
-    tasks=tasks.filter(t=>{
-      const d=new Date(t.createdAt||t.created_at||t.deadline||0);
-      if(Number.isNaN(d.getTime()))return false;
-      return (!from || d>=from) && (!to || d<=to);
-    });
-  }
-  return {tasks,employee,period,startVal,endVal};
-}
-
 async function downloadTaskReport(kind){
   if(!APP.currentUser)return;
-  if(kind==='csv')return toast('CSV report is disabled. Please use Excel or PDF.');
   const buttons=document.querySelectorAll('.report-btn');
   buttons.forEach(b=>b.disabled=true);
   try{
-    const filter=reportFilteredTasks();
-    const tasks=filter.tasks;
-    await ensureReportLibraries();
-
+    const employee=isOwner()?((document.getElementById('reportEmployee')||{}).value||'ALL'):APP.currentUser.name;
+    const period=(document.getElementById('reportPeriod')||{}).value||'all';
+    const r=await api('getTaskReport',{employeeId:APP.currentUser.employeeId,employee,period});
+    const tasks=r.tasks||[];
     const rows=tasks.map(t=>({
       'Task ID':t.id||'',
       'Task Type':t.taskType||'',
       'Department':t.department||t.taskDepartment||'Other',
       'Assigned To':taskAssignedToText(t),
-      'Assigned By':t.createdByName||t.assignedBy||'',
+      'Assigned By':t.createdByName||'',
       'Follow-up':t.followUpTo||'',
       'Priority':t.priority||'Medium',
       'Deadline':t.deadline||'',
-      'Status':normalizeTaskStatus(t.status||'Pending'),
+      'Status':t.status||'Pending',
       'Created At':t.createdAt||'',
       'Completed At':t.completedAt||''
     }));
-
     const stamp=new Date().toISOString().replace(/[:.]/g,'-').slice(0,19);
-    const safeEmployee=String(filter.employee||'ALL').replace(/[^a-z0-9]+/gi,'_');
-    const base='TASK_COMMAND_'+safeEmployee+'_'+filter.period+'_'+stamp;
+    const base='TASK_COMMAND_'+String(employee||'ALL').replace(/[^a-z0-9]+/gi,'_')+'_'+period+'_'+stamp;
 
-    if(kind==='xlsx' || kind==='excel'){
-      const ws=XLSX.utils.json_to_sheet(rows.length?rows:[{
-        'Task ID':'','Task Type':'','Department':'','Assigned To':'','Assigned By':'','Follow-up':'','Priority':'','Deadline':'','Status':'','Created At':'','Completed At':''
-      }]);
+    if(kind==='csv'){
+      const headers=Object.keys(rows[0]||{
+        'Task ID':'','Task Type':'','Department':'','Assigned To':'','Assigned By':'',
+        'Follow-up':'','Priority':'','Deadline':'','Status':'','Created At':'','Completed At':''
+      });
+      const csv=[headers.join(','),...rows.map(row=>headers.map(h=>{
+        const v=String(row[h]??'').replace(/"/g,'""');
+        return '"'+v+'"';
+      }).join(','))].join('\r\n');
+      const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
+      const url=URL.createObjectURL(blob);
+      const a=document.createElement('a');a.href=url;a.download=base+'.csv';a.click();
+      setTimeout(()=>URL.revokeObjectURL(url),1000);
+      toast('CSV downloaded — '+tasks.length+' task(s)');
+      return;
+    }
+
+    if(kind==='xlsx'){
+      if(!window.XLSX)throw new Error('Excel export library is not loaded. Refresh the page and try again.');
+      const ws=XLSX.utils.json_to_sheet(rows);
       const wb=XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb,ws,'Task Report');
       XLSX.writeFile(wb,base+'.xlsx');
-      toast('Excel report downloaded — '+tasks.length+' task(s)');
+      toast('Excel downloaded — '+tasks.length+' task(s)');
       return;
     }
 
     if(kind==='pdf'){
-      const jsPDF=window.jspdf.jsPDF;
-      const doc=new jsPDF({orientation:'landscape',unit:'pt',format:'a4'});
-      const pageW=doc.internal.pageSize.getWidth();
-      doc.setFontSize(20);doc.setTextColor(23,59,143);
-      doc.text('TASK COMMAND',pageW/2,38,{align:'center'});
-      doc.setFontSize(11);doc.setTextColor(91,55,255);
-      doc.text('TASK PERFORMANCE REPORT',pageW/2,56,{align:'center'});
-      doc.setFontSize(9);doc.setTextColor(100,116,139);
-      doc.text('Employee: '+filter.employee+'  •  Period: '+String(filter.period).toUpperCase()+'  •  Generated: '+new Date().toLocaleString(),pageW/2,72,{align:'center'});
+      if(!window.jspdf?.jsPDF)throw new Error('PDF export library is not loaded. Refresh the page and try again.');
+      const doc=new jspdf.jsPDF({orientation:'landscape',unit:'pt',format:'a4'});
+      doc.setFontSize(20);
+      doc.setTextColor(23,59,143);
+      doc.text('TASK COMMAND',doc.internal.pageSize.getWidth()/2,38,{align:'center'});
+      doc.setFontSize(11);
+      doc.setTextColor(91,55,255);
+      doc.text('TASK PERFORMANCE REPORT',doc.internal.pageSize.getWidth()/2,56,{align:'center'});
+      doc.setFontSize(9);
+      doc.setTextColor(100,116,139);
+      doc.text('Employee: '+employee+'   •   Period: '+String(period).toUpperCase()+'   •   Generated: '+new Date().toLocaleString(),doc.internal.pageSize.getWidth()/2,72,{align:'center'});
 
-      const completed=tasks.filter(t=>normalizeTaskStatus(t.status)==='Completed').length;
-      const pending=tasks.filter(t=>normalizeTaskStatus(t.status)==='Pending').length;
-      const progress=tasks.filter(t=>normalizeTaskStatus(t.status)==='In Progress').length;
-      doc.setFontSize(10);doc.setTextColor(23,32,51);
-      doc.text('Total: '+tasks.length+'    Completed: '+completed+'    Pending: '+pending+'    In Progress: '+progress,40,96);
+      const total=tasks.length;
+      const completed=tasks.filter(t=>String(t.status).toLowerCase()==='completed').length;
+      const pending=tasks.filter(t=>String(t.status).toLowerCase()==='pending').length;
+      const progress=tasks.filter(t=>String(t.status).toLowerCase()==='in progress').length;
+
+      doc.setFontSize(10);
+      doc.setTextColor(23,32,51);
+      doc.text('Total: '+total+'    Completed: '+completed+'    Pending: '+pending+'    In Progress: '+progress,40,96);
 
       const head=[['TASK ID','TASK TYPE','DEPARTMENT','ASSIGNED TO','ASSIGNED BY','PRIORITY','DEADLINE','STATUS']];
-      const body=tasks.map(t=>[t.id||'',t.taskType||'',t.department||t.taskDepartment||'Other',taskAssignedToText(t),t.createdByName||t.assignedBy||'—',t.priority||'Medium',t.deadline||'—',normalizeTaskStatus(t.status||'Pending')]);
+      const body=tasks.map(t=>[
+        t.id||'',
+        t.taskType||'',
+        t.department||t.taskDepartment||'Other',
+        taskAssignedToText(t),
+        t.createdByName||'—',
+        t.priority||'Medium',
+        t.deadline||'—',
+        t.status||'Pending'
+      ]);
 
       if(typeof doc.autoTable==='function'){
-        doc.autoTable({head,body,startY:110,styles:{fontSize:7,cellPadding:4},headStyles:{fillColor:[23,59,143],textColor:255},alternateRowStyles:{fillColor:[247,249,252]}});
+        doc.autoTable({
+          head,
+          body,
+          startY:110,
+          styles:{fontSize:7,cellPadding:4},
+          headStyles:{fillColor:[23,59,143],textColor:255},
+          alternateRowStyles:{fillColor:[247,249,252]}
+        });
       }else{
-        let y=115;doc.setFontSize(7);
-        head[0].forEach((h,i)=>doc.text(h,40+i*90,y));y+=14;
-        body.forEach(row=>{row.forEach((v,i)=>doc.text(String(v).slice(0,18),40+i*90,y));y+=12;if(y>550){doc.addPage();y=40;}});
+        let y=115;
+        doc.setFontSize(7);
+        head[0].forEach((h,i)=>doc.text(h,40+i*90,y));
+        y+=14;
+        body.forEach(row=>{
+          row.forEach((v,i)=>doc.text(String(v).slice(0,18),40+i*90,y));
+          y+=12;
+          if(y>550){doc.addPage();y=40;}
+        });
       }
+
       doc.save(base+'.pdf');
-      toast('PDF report downloaded — '+tasks.length+' task(s)');
+      toast('PDF downloaded — '+tasks.length+' task(s)');
       return;
     }
-    throw new Error('Please select Excel or PDF.');
-  }catch(e){
-    console.error('REPORT EXPORT ERROR',e);
-    toast(e.message||String(e));
-  }finally{buttons.forEach(b=>b.disabled=false);}
-}
 
-hideCsvReportUI();
+    throw new Error('Unknown report format.');
+  }catch(e){
+    toast(e.message||String(e));
+  }finally{
+    buttons.forEach(b=>b.disabled=false);
+  }
+}
 
 function updateProfileUI(){const m=APP.currentUser;if(!m)return;document.getElementById('userProfileName').textContent=m.name;document.getElementById('sidebarUserName').textContent=m.name;document.getElementById('sidebarUserRole').textContent=m.role||'Active User';document.getElementById('sidebarUserRole2').textContent=m.role||'Active User';document.getElementById('sidebarUserDepartment').textContent=m.department?('Department: '+m.department):'';document.getElementById('headerUserDepartment').textContent=m.department?('Department: '+m.department):'';const ld=document.getElementById('loginDepartment');if(ld){ld.textContent=m.department?'Department: '+m.department:'';ld.style.display=m.department?'block':'none'}setAvatar('headerAvatar',m);setAvatar('sidebarAvatar',m);fillProfile(m)}
 function setAvatar(id,m){const el=document.getElementById(id);if(!el)return;if(m.photo)el.innerHTML=`<img src="${escapeHtml(m.photo)}">`;else el.textContent=initials(m.name)}
@@ -895,3 +848,86 @@ document.addEventListener('keydown',e=>{if(e.key==='Enter'&&(document.activeElem
 window.addEventListener('load',init);
 
 document.addEventListener('click',function(e){const wrap=document.getElementById('multiAssignee');if(wrap&&!wrap.contains(e.target))closeAssigneePicker();});
+/* TASK COMMAND - REPORT EXPORT FINAL PATCH
+   Uses only the currently filtered task data. No API export RPC and no external libraries required.
+*/
+(function(){
+'use strict';
+
+function _reportEsc(v){return String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&apos;');}
+function _reportNorm(v){return String(v==null?'':v).trim().toLowerCase();}
+function _reportStatus(v){const s=_reportNorm(v).replace(/_/g,'-'); if(s==='in-progress'||s==='in progress')return 'In Progress'; if(s==='completed'||s==='complete')return 'Completed'; if(s==='under-review'||s==='under review')return 'Under Review'; if(s==='cancelled'||s==='canceled')return 'Cancelled'; return 'Pending';}
+function _reportAssigned(t){try{if(typeof taskAssignedToText==='function')return taskAssignedToText(t)||'';}catch(e){} return t.assignedTo||t.assigned_to||'';}
+function _reportFiltered(){
+  let tasks=Array.isArray(APP.tasks)?APP.tasks.slice():[];
+  const empEl=document.getElementById('reportEmployee');
+  const periodEl=document.getElementById('reportPeriod');
+  const startEl=document.getElementById('reportStartDate')||document.getElementById('reportStart');
+  const endEl=document.getElementById('reportEndDate')||document.getElementById('reportEnd');
+  const employee=isOwner()?String(empEl?.value||'ALL'):(APP.currentUser?.name||'');
+  const period=_reportNorm(periodEl?.value||'all');
+  const startVal=startEl?.value||'';
+  const endVal=endEl?.value||'';
+  if(employee && employee!=='ALL'){
+    const want=_reportNorm(employee);
+    tasks=tasks.filter(t=>_reportAssigned(t).split(',').some(n=>_reportNorm(n)===want)||_reportNorm(t.assignedTo)===want||_reportNorm(t.assigned_to)===want);
+  }else if(!isOwner()){
+    const want=_reportNorm(APP.currentUser?.name||'');
+    tasks=tasks.filter(t=>_reportAssigned(t).split(',').some(n=>_reportNorm(n)===want)||_reportNorm(t.assignedTo)===want||_reportNorm(t.assigned_to)===want);
+  }
+  let from=null,to=null,now=new Date();
+  if(period==='daily'||period==='day'){from=new Date(now.getFullYear(),now.getMonth(),now.getDate());to=new Date(from);to.setDate(to.getDate()+1);}
+  else if(period==='weekly'||period==='week'){from=new Date(now);from.setHours(0,0,0,0);let d=from.getDay();from.setDate(from.getDate()-(d===0?6:d-1));to=new Date(from);to.setDate(to.getDate()+7);}
+  else if(period==='monthly'||period==='month'){from=new Date(now.getFullYear(),now.getMonth(),1);to=new Date(now.getFullYear(),now.getMonth()+1,1);}
+  else if(period==='custom'){if(startVal)from=new Date(startVal+'T00:00:00');if(endVal)to=new Date(endVal+'T23:59:59');}
+  if(from||to)tasks=tasks.filter(t=>{const d=new Date(t.createdAt||t.created_at||t.deadline||0);if(isNaN(d.getTime()))return false;return (!from||d>=from)&&(!to||d<=to);});
+  return {tasks,employee:employee||'ALL',period,startVal,endVal};
+}
+function _rows(f){return f.tasks.map(t=>[t.id||t.task_id||'',t.taskType||t.task_type||'',t.department||t.taskDepartment||'Other',_reportAssigned(t),t.createdByName||t.assignedBy||t.assigned_by_name||'',t.priority||'Medium',t.deadline||'',_reportStatus(t.status),t.createdAt||t.created_at||'',t.completedAt||t.completed_at||'']);}
+function _downloadBytes(bytes,name,type){const blob=new Blob([bytes],{type:type||'application/octet-stream'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),2000);}
+
+/* ZIP writer with STORE compression. This is enough for a valid .xlsx file. */
+function _crc32(bytes){let table=_crc32.table;if(!table){table=new Uint32Array(256);for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=(c&1)?(0xedb88320^(c>>>1)):(c>>>1);table[n]=c>>>0;} _crc32.table=table;}let c=0xffffffff;for(let i=0;i<bytes.length;i++)c=table[(c^bytes[i])&255]^(c>>>8);return (c^0xffffffff)>>>0;}
+function _u16(n){return [n&255,(n>>>8)&255];} function _u32(n){return [n&255,(n>>>8)&255,(n>>>16)&255,(n>>>24)&255];}
+function _strBytes(s){const enc=new TextEncoder();return Array.from(enc.encode(s));}
+function _zip(files){let out=[],central=[],offset=0;files.forEach(f=>{const name=_strBytes(f.name),data=_strBytes(f.data),crc=_crc32(data);const h=[0x50,0x4b,3,4,..._u16(20),..._u16(0),..._u16(0),..._u16(0),..._u16(0),..._u32(crc),..._u32(data.length),..._u32(data.length),..._u16(name.length),0, ...name];out.push(...h,...data);const c=[0x50,0x4b,1,2,20,0,20,0,..._u16(0),..._u16(0),..._u16(0),..._u16(0),..._u16(0),..._u32(crc),..._u32(data.length),..._u32(data.length),..._u16(name.length),0,0,..._u16(0),..._u16(0),..._u16(0),..._u32(0),..._u32(offset),...name];central.push(c);offset+=h.length+data.length;});const cdStart=offset;const cd=central.flat();out.push(...cd);out.push(0x50,0x4b,5,6,0,0,0,0,..._u16(files.length),..._u16(files.length),..._u32(cd.length),..._u32(cdStart),0,0);return new Uint8Array(out);}
+function _xlsxXml(rows){const headers=['Task ID','Task Type','Department','Assigned To','Assigned By','Priority','Deadline','Status','Created At','Completed At'];const all=[headers,...rows];function cell(v){return '<c t="inlineStr"><is><t>'+_reportEsc(v)+'</t></is></c>';}const sheet=all.map((r,i)=>'<row r="'+(i+1)+'">'+r.map(cell).join('')+'</row>').join('');return {contentTypes:'<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>',rels:'<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>',workbook:'<?xml version="1.0" encoding="UTF-8"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Task Report" sheetId="1" r:id="rId1"/></sheets></workbook>',workbookrels:'<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>',sheet:'<?xml version="1.0" encoding="UTF-8"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>'+sheet+'</sheetData></worksheet>'};}
+function _makeXlsx(rows){const x=_xlsxXml(rows);return _zip([{name:'[Content_Types].xml',data:x.contentTypes},{name:'_rels/.rels',data:x.rels},{name:'xl/workbook.xml',data:x.workbook},{name:'xl/_rels/workbook.xml.rels',data:x.workbookrels},{name:'xl/worksheets/sheet1.xml',data:x.sheet}]);}
+
+/* Minimal real PDF writer, no external CDN/library needed. */
+function _pdfEscape(s){return String(s??'').replace(/\\/g,'\\\\').replace(/\(/g,'\\(').replace(/\)/g,'\\)');}
+function _makePdf(rows,f){const W=842,H=595,objs=[];function add(s){objs.push(s);return objs.length;}const font=add('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>');let pages=[];let lines=['TASK COMMAND - TASK PERFORMANCE REPORT','Employee: '+f.employee+'   Period: '+String(f.period).toUpperCase(),'Total Tasks: '+f.tasks.length,''];rows.forEach(r=>lines.push(r.map(v=>String(v||'').slice(0,18)).join(' | ')));let chunks=[];let chunk=[];for(const l of lines){chunk.push(l);if(chunk.length>=31){chunks.push(chunk);chunk=[];}}if(chunk.length)chunks.push(chunk);for(const arr of chunks){let content='BT /F1 9 Tf 30 560 Td 12 TL ';arr.forEach((l,i)=>{if(i===0)content+=' /F1 15 Tf ('+_pdfEscape(l)+') Tj /F1 9 Tf T* ';else content+='('+_pdfEscape(l)+') Tj T* ';});content+='ET';const stream=add('<< /Length '+content.length+' >>\nstream\n'+content+'\nendstream');const page=add('<< /Type /Page /Parent 0 0 R /MediaBox [0 0 '+W+' '+H+'] /Resources << /Font << /F1 '+font+' 0 R >> >> /Contents '+stream+' 0 R >>');pages.push(page);}const kids=pages.map(n=>n+' 0 R').join(' ');const pagesObj=add('<< /Type /Pages /Kids ['+kids+'] /Count '+pages.length+' >>');for(const n of pages){objs[n-1]=objs[n-1].replace('/Parent 0 0 R','/Parent '+pagesObj+' 0 R');}const catalog=add('<< /Type /Catalog /Pages '+pagesObj+' 0 R >>');let pdf='%PDF-1.4\n',offs=[0];for(let i=0;i<objs.length;i++){offs[i+1]=pdf.length;pdf+=(i+1)+' 0 obj\n'+objs[i]+'\nendobj\n';}const xref=pdf.length;pdf+='xref\n0 '+(objs.length+1)+'\n0000000000 65535 f \n';for(let i=1;i<offs.length;i++)pdf+=String(offs[i]).padStart(10,'0')+' 00000 n \n';pdf+='trailer\n<< /Size '+(objs.length+1)+' /Root '+catalog+' 0 R >>\nstartxref\n'+xref+'\n%%EOF';return new TextEncoder().encode(pdf);}
+
+async function _finalDownloadTaskReport(kind){
+  if(!APP?.currentUser){try{toast('Please login first.')}catch(e){}return;}
+  const f=_reportFiltered(), rows=_rows(f);const stamp=new Date().toISOString().slice(0,19).replace(/[:T]/g,'-');const safe=String(f.employee||'ALL').replace(/[^a-z0-9]+/gi,'_');const base='TASK_COMMAND_'+safe+'_'+f.period+'_'+stamp;
+  try{
+    if(kind==='csv'){try{toast('CSV is disabled. Use Excel or PDF.')}catch(e){}return;}
+    if(kind==='excel'||kind==='xlsx'){
+      const bytes=_makeXlsx(rows);_downloadBytes(bytes,base+'.xlsx','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');try{toast('Excel report downloaded — '+rows.length+' task(s)')}catch(e){}return;
+    }
+    if(kind==='pdf'){
+      const bytes=_makePdf(rows,f);_downloadBytes(bytes,base+'.pdf','application/pdf');try{toast('PDF report downloaded — '+rows.length+' task(s)')}catch(e){}return;
+    }
+    throw new Error('Select Excel or PDF.');
+  }catch(e){console.error('REPORT DOWNLOAD ERROR',e);try{toast('Report download failed: '+(e.message||e))}catch(x){alert('Report download failed: '+(e.message||e))}}
+}
+
+/* Override the previous export function without touching other app features. */
+window.downloadTaskReport=_finalDownloadTaskReport;
+
+/* Remove CSV buttons and make Excel/PDF buttons work even if their old onclick is missing. */
+function _bindReportButtons(){
+  document.querySelectorAll('button,a,.report-btn').forEach(btn=>{
+    const text=(btn.textContent||'').trim().toLowerCase();const oc=(btn.getAttribute('onclick')||'').toLowerCase();
+    if(text.includes('csv')||oc.includes('csv')){btn.style.display='none';return;}
+    if(text.includes('excel')||text.includes('xlsx')||oc.includes("'xlsx'")||oc.includes('"xlsx"')||oc.includes("'excel'")||oc.includes('"excel"')){
+      if(!btn.dataset.tcReportBound){btn.dataset.tcReportBound='1';btn.addEventListener('click',function(e){e.preventDefault();e.stopImmediatePropagation();_finalDownloadTaskReport('excel');});}
+    }else if(text.includes('pdf')||oc.includes("'pdf'")||oc.includes('"pdf"')){
+      if(!btn.dataset.tcReportBound){btn.dataset.tcReportBound='1';btn.addEventListener('click',function(e){e.preventDefault();e.stopImmediatePropagation();_finalDownloadTaskReport('pdf');});}
+    }
+  });
+}
+window.addEventListener('load',()=>setTimeout(_bindReportButtons,300));
+setTimeout(_bindReportButtons,1000);
+})();
