@@ -890,86 +890,13 @@ function _downloadBytes(bytes,name,type){const blob=new Blob([bytes],{type:type|
 function _crc32(bytes){let table=_crc32.table;if(!table){table=new Uint32Array(256);for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=(c&1)?(0xedb88320^(c>>>1)):(c>>>1);table[n]=c>>>0;} _crc32.table=table;}let c=0xffffffff;for(let i=0;i<bytes.length;i++)c=table[(c^bytes[i])&255]^(c>>>8);return (c^0xffffffff)>>>0;}
 function _u16(n){return [n&255,(n>>>8)&255];} function _u32(n){return [n&255,(n>>>8)&255,(n>>>16)&255,(n>>>24)&255];}
 function _strBytes(s){const enc=new TextEncoder();return Array.from(enc.encode(s));}
-function _zip(files){let out=[],central=[],offset=0;files.forEach(f=>{const name=_strBytes(f.name),data=_strBytes(f.data),crc=_crc32(data);const h=[0x50,0x4b,3,4,..._u16(20),..._u16(0),..._u16(0),..._u16(0),..._u16(0),..._u32(crc),..._u32(data.length),..._u32(data.length),..._u16(name.length),0,0, ...name];out.push(...h,...data);const c=[0x50,0x4b,1,2,20,0,20,0,..._u16(0),..._u16(0),..._u16(0),..._u16(0),..._u32(crc),..._u32(data.length),..._u32(data.length),..._u16(name.length),0,0,..._u16(0),..._u16(0),..._u16(0),..._u32(0),..._u32(offset),...name];central.push(c);offset+=h.length+data.length;});const cdStart=offset;const cd=central.flat();out.push(...cd);out.push(0x50,0x4b,5,6,0,0,0,0,..._u16(files.length),..._u16(files.length),..._u32(cd.length),..._u32(cdStart),0,0);return new Uint8Array(out);}
-function _xlsxXml(rows){
-  const headers=['Task ID','Task Type','Department','Assigned To','Assigned By','Priority','Deadline','Status','Created At','Completed At'];
-  const all=[headers,...rows];
-  function cell(v,style){return '<c r="" s="'+style+'" t="inlineStr"><is><t>'+_reportEsc(v)+'</t></is></c>';}
-  let sheet='';
-  // Title + subtitle + report metadata + KPI cards + blank spacer + table
-  sheet += '<row r="1" ht="28"><c r="A1" s="1" t="inlineStr"><is><t>TASK COMMAND</t></is></c></row>';
-  sheet += '<row r="2" ht="22"><c r="A2" s="2" t="inlineStr"><is><t>TASK PERFORMANCE REPORT</t></is></c></row>';
-  sheet += '<row r="3" ht="20"><c r="A3" s="3" t="inlineStr"><is><t>Employee: '+_reportEsc(window.__tcReportEmployee||'ALL')+'   •   Period: '+_reportEsc(String(window.__tcReportPeriod||'ALL').toUpperCase())+'   •   Generated: '+_reportEsc(new Date().toLocaleString())+'</t></is></c></row>';
-  const total=rows.length, completed=rows.filter(r=>String(r[7]).toLowerCase()==='completed').length, pending=rows.filter(r=>String(r[7]).toLowerCase()==='pending').length, progress=rows.filter(r=>String(r[7]).toLowerCase()==='in progress').length;
-  const kpis=[['TOTAL TASKS',total,4,5],['COMPLETED',completed,6,7],['PENDING',pending,8,9],['IN PROGRESS',progress,10,11]];
-  // Header row and value row, each KPI occupies 3 columns.
-  const cols=['A','D','G','J'];
-  kpis.forEach((k,idx)=>{
-    const c=cols[idx]; sheet += '<row r="5" ht="20"><c r="'+c+'5" s="'+k[2]+'" t="inlineStr"><is><t>'+k[0]+'</t></is></c></row>';
-    sheet += '<row r="6" ht="30"><c r="'+c+'6" s="'+k[3]+'" t="n"><v>'+k[1]+'</v></c></row>';
-  });
-  sheet += '<row r="8" ht="24">'+headers.map((h,i)=>cell(h,12)).join('')+'</row>';
-  rows.forEach((r,ri)=>{
-    const rr=9+ri;
-    const status=String(r[7]).toLowerCase();
-    const style=status==='completed'?14:(status==='in progress'?15:16);
-    sheet += '<row r="'+rr+'" ht="24">'+r.map((v,i)=>cell(v,i===7?style:13)).join('')+'</row>';
-  });
-  const endRow=Math.max(8,8+rows.length);
-  const merges='<mergeCells count="10"><mergeCell ref="A1:J1"/><mergeCell ref="A2:J2"/><mergeCell ref="A3:J3"/><mergeCell ref="A5:C5"/><mergeCell ref="D5:F5"/><mergeCell ref="G5:I5"/><mergeCell ref="A6:C6"/><mergeCell ref="D6:F6"/><mergeCell ref="G6:I6"/><mergeCell ref="J6:J6"/></mergeCells>';
-  const mergeKpi='<mergeCells count="7"><mergeCell ref="A1:J1"/><mergeCell ref="A2:J2"/><mergeCell ref="A3:J3"/><mergeCell ref="A5:C5"/><mergeCell ref="D5:F5"/><mergeCell ref="G5:I5"/><mergeCell ref="J5:J5"/></mergeCells>';
-  // Keep J as the fourth KPI column and merge its title/value area separately.
-  const merges2='<mergeCells count="7"><mergeCell ref="A1:J1"/><mergeCell ref="A2:J2"/><mergeCell ref="A3:J3"/><mergeCell ref="A5:C5"/><mergeCell ref="D5:F5"/><mergeCell ref="G5:I5"/><mergeCell ref="J5:J5"/></mergeCells>';
-  const colsXml='<cols><col min="1" max="1" width="18"/><col min="2" max="2" width="24"/><col min="3" max="3" width="18"/><col min="4" max="4" width="24"/><col min="5" max="5" width="20"/><col min="6" max="6" width="14"/><col min="7" max="7" width="16"/><col min="8" max="8" width="18"/><col min="9" max="10" width="22"/></cols>';
-  const conditional='<autoFilter ref="A8:J'+endRow+'"/>';
-  const sheetXml='<?xml version="1.0" encoding="UTF-8"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetPr><outlinePr summaryBelow="1"/></sheetPr>'+colsXml+'<sheetViews><sheetView workbookViewId="0"><pane ySplit="8" topLeftCell="A9" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="20"/><sheetData>'+sheet+'</sheetData>'+conditional+merges+'</worksheet>';
-  // Add the missing fourth KPI title/value in J explicitly.
-  const fixed=sheetXml.replace('<row r="5" ht="20"><c r="J5" s="10" t="inlineStr"><is><t>IN PROGRESS</t></is></c></row>','<row r="5" ht="20"><c r="J5" s="10" t="inlineStr"><is><t>IN PROGRESS</t></is></c></row>');
-  const styles='<?xml version="1.0" encoding="UTF-8"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="0"/><fonts count="4"><font><sz val="11"/><name val="Aptos"/></font><font><b/><sz val="22"/><color rgb="FFFFFFFF"/><name val="Aptos Display"/></font><font><b/><sz val="14"/><color rgb="FF5B37FF"/><name val="Aptos Display"/></font><font><b/><sz val="10"/><color rgb="FF64748B"/><name val="Aptos"/></font></fonts><fills count="7"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF173B8F"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FF5B37FF"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE8F1FF"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE8F8F0"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFFFF5E3"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="3"><border><left/><right/><top/><bottom/><diagonal/></border><border><left/><right/><top/><bottom style="thin" color="FFD7E0EF"/><diagonal/></border><border><left style="thin" color="FFD7E0EF"/><right style="thin" color="FFD7E0EF"/><top style="thin" color="FFD7E0EF"/><bottom style="thin" color="FFD7E0EF"/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="17"><xf numFmtId="0" fontId="1" fillId="2" borderId="0" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="0" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="3" fillId="0" borderId="0" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/><xf numFmtId="0" fontId="3" fillId="2" borderId="2" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="0" fontId="0" fillId="4" borderId="2" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="0" fontId="0" fillId="2" borderId="2" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="0" fontId="0" fillId="5" borderId="2" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="0" fontId="0" fillId="6" borderId="2" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="0" fontId="0" fillId="4" borderId="2" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="0" fontId="0" fillId="2" borderId="2" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf><xf numFmtId="0" fontId="0" fillId="3" borderId="2" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="2" applyAlignment="1"><alignment vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="0" fillId="5" borderId="2" applyAlignment="1"><alignment vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="0" fillId="4" borderId="2" applyAlignment="1"><alignment vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="0" fillId="6" borderId="2" applyAlignment="1"><alignment vertical="center" wrapText="1"/></xf></cellXfs></styleSheet>';
-  return {contentTypes:'<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>',rels:'<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>',workbook:'<?xml version="1.0" encoding="UTF-8"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Task Report" sheetId="1" r:id="rId1"/></sheets></workbook>',workbookrels:'<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>',sheet:fixed,styles};
-}
-function _makeXlsx(rows,f){window.__tcReportEmployee=f.employee;window.__tcReportPeriod=f.period;const x=_xlsxXml(rows);return _zip([{name:'[Content_Types].xml',data:x.contentTypes},{name:'_rels/.rels',data:x.rels},{name:'xl/workbook.xml',data:x.workbook},{name:'xl/_rels/workbook.xml.rels',data:x.workbookrels},{name:'xl/styles.xml',data:x.styles},{name:'xl/worksheets/sheet1.xml',data:x.sheet}]);}
+function _zip(files){let out=[],central=[],offset=0;files.forEach(f=>{const name=_strBytes(f.name),data=_strBytes(f.data),crc=_crc32(data);const h=[0x50,0x4b,3,4,..._u16(20),..._u16(0),..._u16(0),..._u16(0),..._u16(0),..._u32(crc),..._u32(data.length),..._u32(data.length),..._u16(name.length),0, ...name];out.push(...h,...data);const c=[0x50,0x4b,1,2,20,0,20,0,..._u16(0),..._u16(0),..._u16(0),..._u16(0),..._u16(0),..._u32(crc),..._u32(data.length),..._u32(data.length),..._u16(name.length),0,0,..._u16(0),..._u16(0),..._u16(0),..._u32(0),..._u32(offset),...name];central.push(c);offset+=h.length+data.length;});const cdStart=offset;const cd=central.flat();out.push(...cd);out.push(0x50,0x4b,5,6,0,0,0,0,..._u16(files.length),..._u16(files.length),..._u32(cd.length),..._u32(cdStart),0,0);return new Uint8Array(out);}
+function _xlsxXml(rows){const headers=['Task ID','Task Type','Department','Assigned To','Assigned By','Priority','Deadline','Status','Created At','Completed At'];const all=[headers,...rows];function cell(v){return '<c t="inlineStr"><is><t>'+_reportEsc(v)+'</t></is></c>';}const sheet=all.map((r,i)=>'<row r="'+(i+1)+'">'+r.map(cell).join('')+'</row>').join('');return {contentTypes:'<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>',rels:'<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>',workbook:'<?xml version="1.0" encoding="UTF-8"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Task Report" sheetId="1" r:id="rId1"/></sheets></workbook>',workbookrels:'<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>',sheet:'<?xml version="1.0" encoding="UTF-8"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>'+sheet+'</sheetData></worksheet>'};}
+function _makeXlsx(rows){const x=_xlsxXml(rows);return _zip([{name:'[Content_Types].xml',data:x.contentTypes},{name:'_rels/.rels',data:x.rels},{name:'xl/workbook.xml',data:x.workbook},{name:'xl/_rels/workbook.xml.rels',data:x.workbookrels},{name:'xl/worksheets/sheet1.xml',data:x.sheet}]);}
 
-/* Colorful PDF report — intentionally matches the dashboard/report look without external libraries. */
-function _pdfEscape(v){return String(v==null?'':v).replace(/[•·]/g,' | ').replace(/[–—]/g,'-').replace(/[“”]/g,'\"').replace(/[‘’]/g,"'").replace(/[^\x20-\x7E]/g,' ').replace(/\\/g,'\\\\').replace(/\(/g,'\\(').replace(/\)/g,'\\)');}
-function _makePdf(rows,f){
-  const W=842,H=595,objs=[];function add(s){objs.push(s);return objs.length;}
-  const font=add('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>');
-  const bold=add('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>');
-  const total=rows.length, completed=rows.filter(r=>String(r[7]).toLowerCase()==='completed').length, pending=rows.filter(r=>String(r[7]).toLowerCase()==='pending').length, progress=rows.filter(r=>String(r[7]).toLowerCase()==='in progress').length;
-  const pageW=W, pageH=H, x0=28, contentW=W-56;
-  const pages=[];
-  function rgb(r,g,b){return (r/255).toFixed(3)+' '+(g/255).toFixed(3)+' '+(b/255).toFixed(3);}
-  function rect(x,y,w,h,fill){return rgb(fill[0],fill[1],fill[2])+' rg '+x+' '+(pageH-y-h)+' '+w+' '+h+' re f ';}
-  function line(x1,y1,x2,y2,stroke,w=1){return rgb(stroke[0],stroke[1],stroke[2])+' RG '+w+' w '+x1+' '+(pageH-y1)+' m '+x2+' '+(pageH-y2)+' l S ';}
-  function text(x,y,size,str,color=[23,32,51],isBold=false,align='left'){
-    const t=_pdfEscape(str);const width=String(str).length*size*(isBold?.56:.52);let xx=x;if(align==='center')xx=x-width/2;return 'BT /F'+(isBold?'2':'1')+' '+size+' Tf '+rgb(...color)+' rg '+xx+' '+(pageH-y)+' Td ('+t+') Tj ET ';}
-  const cols=[82,103,96,98,104,72,90,101];
-  let bodyRows=rows.map(r=>[r[0],r[1],r[2],r[3],r[4]||'—',r[5],r[6]||'—',r[7]]);
-  let pageBody=[];const maxPerPage=7;for(let i=0;i<bodyRows.length;i+=maxPerPage)pageBody.push(bodyRows.slice(i,i+maxPerPage));if(!pageBody.length)pageBody=[[]];
-  pageBody.forEach((pageRows,pageIndex)=>{
-    let c='';
-    c+=rect(0,0,W,H,[255,255,255]);
-    c+=text(W/2,48,27,'TASK COMMAND',[23,59,143],true,'center');
-    c+=text(W/2,72,16,'TASK PERFORMANCE REPORT',[91,55,255],true,'center');
-    c+=text(W/2,92,10,'Employee: '+f.employee+'   •   Period: '+String(f.period).toUpperCase()+'   •   Generated: '+new Date().toLocaleString(),[100,116,139],true,'center');
-    const kx=[x0,x0+contentW*.25,x0+contentW*.5,x0+contentW*.75], kw=contentW*.25;
-    const cards=[['TOTAL TASKS',total,[232,241,255]],[ 'COMPLETED',completed,[232,248,240] ],['PENDING',pending,[255,247,227]],['IN PROGRESS',progress,[242,236,255]]];
-    cards.forEach((k,i)=>{c+=rect(kx[i],105,kw,55,[255,255,255]);c+=rect(kx[i],105,kw,21,[23,59,143]);c+=text(kx[i]+6,120,9,k[0],[255,255,255],true);c+=rect(kx[i],126,kw,34,k[2]);c+=text(kx[i]+6,150,20,String(k[1]),[23,59,143],true);});
-    const tableY=188, headerH=25, rowH=42;
-    let tx=x0;c+=rect(x0,tableY,contentW,headerH,[23,59,143]);
-    const headers=['TASK ID','TASK TYPE','DEPARTMENT','ASSIGNED TO','ASSIGNED BY','PRIORITY','DEADLINE','STATUS'];
-    headers.forEach((h,i)=>{c+=text(tx+5,tableY+17,7,h,[255,255,255],true);tx+=cols[i];});
-    pageRows.forEach((r,ri)=>{const y=tableY+headerH+ri*rowH;const fill=ri%2?[248,250,253]:[255,255,255];c+=rect(x0,y,contentW,rowH,fill);let xx=x0;r.forEach((v,i)=>{c+=text(xx+5,y+15,7,String(v||'').slice(0,22),[23,32,51],true);if(i<7)c+=line(xx+cols[i],y,xx+cols[i],y+rowH,[215,224,239],.6);xx+=cols[i];});c+=line(x0,y+rowH,x0+contentW,y+rowH,[215,224,239],.6);});
-    c+=line(x0,tableY,x0,tableY+headerH+pageRows.length*rowH,[215,224,239],.7);c+=line(x0+contentW,tableY,x0+contentW,tableY+headerH+pageRows.length*rowH,[215,224,239],.7);
-    const footY=tableY+headerH+pageRows.length*rowH+34;c+=text(W/2,footY,9,'TASK COMMAND  •  Centralized Team Management  •  '+total+' task(s) in this report',[100,116,139],true,'center');
-    if(pageBody.length>1)c+=text(W-32,H-18,8,'Page '+(pageIndex+1)+' of '+pageBody.length,[100,116,139],false,'right');
-    const streamBytes=new TextEncoder().encode(c);const stream=add('<< /Length '+streamBytes.length+' >>\nstream\n'+c+'\nendstream');
-    const page=add('<< /Type /Page /Parent 0 0 R /MediaBox [0 0 '+W+' '+H+'] /Resources << /Font << /F1 '+font+' 0 R /F2 '+bold+' 0 R >> >> /Contents '+stream+' 0 R >>');pages.push(page);
-  });
-  const kids=pages.map(n=>n+' 0 R').join(' '), pagesObj=add('<< /Type /Pages /Kids ['+kids+'] /Count '+pages.length+' >>');for(const n of pages)objs[n-1]=objs[n-1].replace('/Parent 0 0 R','/Parent '+pagesObj+' 0 R');const catalog=add('<< /Type /Catalog /Pages '+pagesObj+' 0 R >>');
-  let pdf='%PDF-1.4\n',offs=[0];for(let i=0;i<objs.length;i++){offs[i+1]=pdf.length;pdf+=(i+1)+' 0 obj\n'+objs[i]+'\nendobj\n';}const xref=pdf.length;pdf+='xref\n0 '+(objs.length+1)+'\n0000000000 65535 f \n';for(let i=1;i<offs.length;i++)pdf+=String(offs[i]).padStart(10,'0')+' 00000 n \n';pdf+='trailer\n<< /Size '+(objs.length+1)+' /Root '+catalog+' 0 R >>\nstartxref\n'+xref+'\n%%EOF';return new TextEncoder().encode(pdf);
-}
+/* Minimal real PDF writer, no external CDN/library needed. */
+function _pdfEscape(s){return String(s??'').replace(/\\/g,'\\\\').replace(/\(/g,'\\(').replace(/\)/g,'\\)');}
+function _makePdf(rows,f){const W=842,H=595,objs=[];function add(s){objs.push(s);return objs.length;}const font=add('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>');let pages=[];let lines=['TASK COMMAND - TASK PERFORMANCE REPORT','Employee: '+f.employee+'   Period: '+String(f.period).toUpperCase(),'Total Tasks: '+f.tasks.length,''];rows.forEach(r=>lines.push(r.map(v=>String(v||'').slice(0,18)).join(' | ')));let chunks=[];let chunk=[];for(const l of lines){chunk.push(l);if(chunk.length>=31){chunks.push(chunk);chunk=[];}}if(chunk.length)chunks.push(chunk);for(const arr of chunks){let content='BT /F1 9 Tf 30 560 Td 12 TL ';arr.forEach((l,i)=>{if(i===0)content+=' /F1 15 Tf ('+_pdfEscape(l)+') Tj /F1 9 Tf T* ';else content+='('+_pdfEscape(l)+') Tj T* ';});content+='ET';const stream=add('<< /Length '+content.length+' >>\nstream\n'+content+'\nendstream');const page=add('<< /Type /Page /Parent 0 0 R /MediaBox [0 0 '+W+' '+H+'] /Resources << /Font << /F1 '+font+' 0 R >> >> /Contents '+stream+' 0 R >>');pages.push(page);}const kids=pages.map(n=>n+' 0 R').join(' ');const pagesObj=add('<< /Type /Pages /Kids ['+kids+'] /Count '+pages.length+' >>');for(const n of pages){objs[n-1]=objs[n-1].replace('/Parent 0 0 R','/Parent '+pagesObj+' 0 R');}const catalog=add('<< /Type /Catalog /Pages '+pagesObj+' 0 R >>');let pdf='%PDF-1.4\n',offs=[0];for(let i=0;i<objs.length;i++){offs[i+1]=pdf.length;pdf+=(i+1)+' 0 obj\n'+objs[i]+'\nendobj\n';}const xref=pdf.length;pdf+='xref\n0 '+(objs.length+1)+'\n0000000000 65535 f \n';for(let i=1;i<offs.length;i++)pdf+=String(offs[i]).padStart(10,'0')+' 00000 n \n';pdf+='trailer\n<< /Size '+(objs.length+1)+' /Root '+catalog+' 0 R >>\nstartxref\n'+xref+'\n%%EOF';return new TextEncoder().encode(pdf);}
 
 async function _finalDownloadTaskReport(kind){
   if(!APP?.currentUser){try{toast('Please login first.')}catch(e){}return;}
@@ -977,7 +904,20 @@ async function _finalDownloadTaskReport(kind){
   try{
     if(kind==='csv'){try{toast('CSV is disabled. Use Excel or PDF.')}catch(e){}return;}
     if(kind==='excel'||kind==='xlsx'){
-      const bytes=_makeXlsx(rows,f);_downloadBytes(bytes,base+'.xlsx','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');try{toast('Excel report downloaded — '+rows.length+' task(s)')}catch(e){}return;
+      if(!window.XLSX || !XLSX.utils || !XLSX.writeFile){
+        throw new Error('Excel export library is not loaded. Please refresh the page.');
+      }
+      const headers=['Task ID','Task Type','Department','Assigned To','Assigned By','Priority','Deadline','Status','Created At','Completed At'];
+      const data=[headers].concat(rows);
+      const ws=XLSX.utils.aoa_to_sheet(data);
+      ws['!cols']=[{wch:14},{wch:30},{wch:16},{wch:24},{wch:22},{wch:12},{wch:14},{wch:16},{wch:22},{wch:22}];
+      ws['!autofilter']={ref:'A1:J'+Math.max(1,data.length)};
+      ws['!freeze']={xSplit:0,ySplit:1};
+      const wb=XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb,ws,'Task Report');
+      XLSX.writeFile(wb,base+'.xlsx',{bookType:'xlsx',compression:true});
+      try{toast('Excel report downloaded — '+rows.length+' task(s)')}catch(e){}
+      return;
     }
     if(kind==='pdf'){
       const bytes=_makePdf(rows,f);_downloadBytes(bytes,base+'.pdf','application/pdf');try{toast('PDF report downloaded — '+rows.length+' task(s)')}catch(e){}return;
@@ -995,9 +935,30 @@ function _bindReportButtons(){
     const text=(btn.textContent||'').trim().toLowerCase();const oc=(btn.getAttribute('onclick')||'').toLowerCase();
     if(text.includes('csv')||oc.includes('csv')){btn.style.display='none';return;}
     if(text.includes('excel')||text.includes('xlsx')||oc.includes("'xlsx'")||oc.includes('"xlsx"')||oc.includes("'excel'")||oc.includes('"excel"')){
-      if(!btn.dataset.tcReportBound){btn.dataset.tcReportBound='1';btn.addEventListener('click',function(e){e.preventDefault();e.stopImmediatePropagation();_finalDownloadTaskReport('excel');});}
+      // Remove the old inline handler. Otherwise one click runs the old exporter
+      // and this exporter, producing two files.
+      btn.removeAttribute('onclick');
+      btn.onclick=null;
+      if(!btn.dataset.tcReportBound){
+        btn.dataset.tcReportBound='1';
+        btn.addEventListener('click',function(e){
+          e.preventDefault();
+          e.stopImmediatePropagation();
+          _finalDownloadTaskReport('excel');
+        },true);
+      }
     }else if(text.includes('pdf')||oc.includes("'pdf'")||oc.includes('"pdf"')){
-      if(!btn.dataset.tcReportBound){btn.dataset.tcReportBound='1';btn.addEventListener('click',function(e){e.preventDefault();e.stopImmediatePropagation();_finalDownloadTaskReport('pdf');});}
+      // Remove the old inline handler for the same reason.
+      btn.removeAttribute('onclick');
+      btn.onclick=null;
+      if(!btn.dataset.tcReportBound){
+        btn.dataset.tcReportBound='1';
+        btn.addEventListener('click',function(e){
+          e.preventDefault();
+          e.stopImmediatePropagation();
+          _finalDownloadTaskReport('pdf');
+        },true);
+      }
     }
   });
 }
