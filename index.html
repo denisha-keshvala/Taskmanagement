@@ -1,1061 +1,368 @@
 <!DOCTYPE html>
-<html lang="en">
-
+<html>
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Task Command System</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <base target="_top">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TASK COMMAND - Management System</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
   <style>
-    :root {
-      --bg-main: #f4f7fe;
-      --bg-sidebar: #0f1424;
-      --card-bg: #ffffff;
-      --text-main: #1f2937;
-      --text-muted: #9ca3af;
-      --primary: #4318ff;
-      --primary-hover: #3311cc;
-      --success: #10b981;
-      --warning: #f59e0b;
-      --danger: #ef4444;
-      --border: #e5e7eb;
+    :root{
+      --bg-main:#f5f7fb;--bg-sidebar:#121829;--card-bg:#fff;--primary:#4318ff;
+      --primary-hover:#3410d9;--text-main:#172033;--text-muted:#718096;--border:#e5e9f2;
+      --danger:#e53e3e;--warning:#d97706;--success:#16a34a;
     }
-
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-      font-family: 'Inter', sans-serif;
-    }
-
-    body {
-      background-color: var(--bg-main);
-      color: var(--text-main);
-      height: 100vh;
-      overflow: hidden;
-    }
-
-    /* LOGIN SCREEN */
-    #loginScreen {
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      height: 100vh;
-      background: linear-gradient(135deg, #121829 0%, #4318ff 100%);
-    }
-
-    .login-box {
-      background: white;
-      padding: 40px;
-      border-radius: 16px;
-      width: 380px;
-      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
-      text-align: center;
-    }
-
-    .login-box h2 {
-      margin-bottom: 20px;
-      color: #121829;
-    }
-
-    .form-group {
-      margin-bottom: 15px;
-      text-align: left;
-    }
-
-    .form-group label {
-      font-size: 0.85rem;
-      font-weight: 600;
-      margin-bottom: 5px;
-      display: block;
-    }
-
-    .form-group input,
-    .form-group select {
-      width: 100%;
-      padding: 10px;
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      font-size: 0.9rem;
-    }
-
-    .btn-primary {
-      width: 100%;
-      background: var(--primary);
-      color: white;
-      border: none;
-      padding: 12px;
-      border-radius: 8px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: 0.2s;
-    }
-
-    .btn-primary:hover {
-      background: var(--primary-hover);
-    }
-
-    .error-msg {
-      color: var(--danger);
-      font-size: 0.8rem;
-      margin-top: 10px;
-      display: none;
-    }
-
-    /* DASHBOARD LAYOUT */
-    #appDashboard {
-      display: none;
-      height: 100vh;
-      width: 100vw;
-      position: relative;
-    }
-
-    /* SIDEBAR (Image exact style + Responsive) */
-    .sidebar {
-      width: 270px;
-      background-color: var(--bg-sidebar);
-      color: white;
-      display: flex;
-      flex-direction: column;
-      padding: 20px 0;
-      overflow-y: auto;
-      flex-shrink: 0;
-      transition: transform 0.3s ease;
-      z-index: 1000;
-    }
-
-    .brand {
-      padding: 0 20px 20px;
-      font-size: 1.25rem;
-      font-weight: 800;
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      letter-spacing: 0.5px;
-    }
-
-    .nav-menu {
-      list-style: none;
-      margin-top: 10px;
-      padding: 0 12px;
-    }
-
-    .nav-item {
-      padding: 12px 16px;
-      font-size: 0.95rem;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      gap: 14px;
-      color: #a3aed1;
-      transition: all 0.2s;
-      font-weight: 600;
-      border-radius: 12px;
-      margin-bottom: 6px;
-    }
-
-    .nav-item:hover,
-    .nav-item.active {
-      background-color: var(--primary);
-      color: white;
-    }
-
-    /* Quick Add Box */
-    .quick-add {
-      margin: 20px 15px;
-      padding: 16px;
-      background: rgba(255, 255, 255, 0.05);
-      border-radius: 14px;
-      border: 1px solid rgba(255, 255, 255, 0.08);
-    }
-
-    .quick-add h4 {
-      margin-bottom: 12px;
-      font-size: 0.9rem;
-      color: #fff;
-      font-weight: 700;
-    }
-
-    .quick-add input,
-    .quick-add select {
-      margin-bottom: 10px;
-      font-size: 0.85rem;
-      background: white;
-      width: 100%;
-      padding: 10px;
-      border-radius: 8px;
-      border: none;
-      outline: none;
-    }
-
-    .user-profile {
-      padding: 15px 20px;
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      border-top: 1px solid rgba(255, 255, 255, 0.08);
-      margin-top: auto;
-    }
-
-    .avatar {
-      width: 42px;
-      height: 42px;
-      background: #a3aed1;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: #0f1424;
-      font-weight: bold;
-      font-size: 1.1rem;
-    }
-
-    /* MAIN CONTENT AREA */
-    .main-wrapper {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      overflow-y: auto;
-      width: 100%;
-    }
-
-    header {
-      background: white;
-      padding: 15px 25px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      border-bottom: 1px solid var(--border);
-    }
-
-    .header-left {
-      display: flex;
-      align-items: center;
-      gap: 15px;
-    }
-
-    .mobile-toggle {
-      display: none;
-      font-size: 1.3rem;
-      cursor: pointer;
-      background: none;
-      border: none;
-      color: var(--text-main);
-    }
-
-    .content-area {
-      padding: 25px;
-    }
-
-    .card {
-      background: white;
-      padding: 20px;
-      border-radius: 12px;
-      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.03);
-      margin-bottom: 25px;
-      overflow-x: auto;
-    }
-
-    .card-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 15px;
-    }
-
-    .grid-2 {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 15px;
-    }
-
-    .grid-3 {
-      display: grid;
-      grid-template-columns: 1fr 1fr 1fr;
-      gap: 15px;
-    }
-
-    /* Rich Text Editor */
-    .editor-toolbar {
-      background: #f8fafc;
-      border: 1px solid var(--border);
-      border-bottom: none;
-      padding: 8px;
-      border-radius: 8px 8px 0 0;
-      display: flex;
-      gap: 8px;
-      align-items: center;
-    }
-
-    .editor-toolbar button {
-      padding: 4px 8px;
-      background: white;
-      border: 1px solid var(--border);
-      border-radius: 4px;
-      cursor: pointer;
-    }
-
-    .editor-content {
-      min-height: 100px;
-      border: 1px solid var(--border);
-      border-radius: 0 0 8px 8px;
-      padding: 10px;
-      background: white;
-      outline: none;
-    }
-
-    /* Buttons & Badges */
-    .btn-sm {
-      padding: 5px 10px;
-      font-size: 0.75rem;
-      border-radius: 6px;
-      border: none;
-      cursor: pointer;
-      color: white;
-      margin-right: 2px;
-    }
-
-    .btn-edit {
-      background: var(--warning);
-    }
-
-    .btn-delete {
-      background: var(--danger);
-    }
-
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 0.85rem;
-      text-align: left;
-      min-width: 650px;
-    }
-
-    th {
-      padding: 12px;
-      border-bottom: 2px solid var(--border);
-      color: var(--text-muted);
-      font-weight: 600;
-    }
-
-    td {
-      padding: 12px;
-      border-bottom: 1px solid var(--border);
-    }
-
-    .badge {
-      padding: 4px 10px;
-      border-radius: 12px;
-      font-size: 0.75rem;
-      font-weight: 600;
-      display: inline-block;
-    }
-
-    .badge-high {
-      background: #fee2e2;
-      color: var(--danger);
-    }
-
-    .badge-medium {
-      background: #fef3c7;
-      color: var(--warning);
-    }
-
-    .badge-low {
-      background: #d1fae5;
-      color: var(--success);
-    }
-
-    .status-overdue {
-      background: #fee2e2;
-      color: var(--danger);
-      font-weight: bold;
-      padding: 3px 6px;
-      border-radius: 4px;
-      font-size: 0.7rem;
-    }
-
-    .modal-page {
-      display: none;
-    }
-
-    .modal-page.active {
-      display: block;
-    }
-
-    /* Sidebar Overlay for Mobile */
-    .sidebar-overlay {
-      display: none;
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100vw;
-      height: 100vh;
-      background: rgba(0, 0, 0, 0.5);
-      z-index: 999;
-    }
-
-    /* RESPONSIVE DESIGN (Mobile Friendly) */
-    @media (max-width: 768px) {
-      .mobile-toggle {
-        display: block;
-      }
-
-      .sidebar {
-        position: fixed;
-        top: 0;
-        left: 0;
-        height: 100vh;
-        transform: translateX(-100%);
-      }
-
-      .sidebar.open {
-        transform: translateX(0);
-      }
-
-      .sidebar-overlay.active {
-        display: block;
-      }
-
-      .grid-2,
-      .grid-3 {
-        grid-template-columns: 1fr;
-      }
-
-      .content-area {
-        padding: 15px;
-      }
-    }
-
-    /* Header Right Section */
-    .header-right {
-      display: flex;
-      align-items: center;
-      gap: 20px;
-    }
-
-    /* Notification Bell Dropdown */
-    .notif-wrapper {
-      position: relative;
-      cursor: pointer;
-    }
-
-    .notif-bell {
-      font-size: 1.2rem;
-      color: var(--text-main);
-      position: relative;
-    }
-
-    .notif-badge {
-      position: absolute;
-      top: -6px;
-      right: -8px;
-      background: var(--danger);
-      color: white;
-      border-radius: 50%;
-      padding: 2px 6px;
-      font-size: 0.65rem;
-      font-weight: bold;
-    }
-
-    .notif-dropdown {
-      display: none;
-      position: absolute;
-      right: 0;
-      top: 35px;
-      width: 280px;
-      background: white;
-      border: 1px solid var(--border);
-      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.15);
-      border-radius: 10px;
-      z-index: 1000;
-      padding: 10px;
-    }
-
-    .notif-dropdown.show {
-      display: block;
-    }
-
-    .notif-item {
-      padding: 8px;
-      border-bottom: 1px solid var(--border);
-      font-size: 0.8rem;
-    }
-
-    .notif-item:last-child {
-      border-bottom: none;
-    }
-
-    /* Header Profile Avatar & Image Upload */
-    .header-profile {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      position: relative;
-    }
-
-    .profile-avatar-container {
-      position: relative;
-      cursor: pointer;
-    }
-
-    .header-avatar {
-      width: 40px;
-      height: 40px;
-      border-radius: 50%;
-      background: var(--primary);
-      color: white;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: bold;
-      object-fit: cover;
-    }
-
-    .photo-upload-overlay {
-      position: absolute;
-      bottom: 0;
-      right: 0;
-      background: rgba(0, 0, 0, 0.6);
-      color: white;
-      border-radius: 50%;
-      width: 16px;
-      height: 16px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 0.55rem;
-    }
+    *{margin:0;padding:0;box-sizing:border-box;font-family:Inter,sans-serif}
+    body{background:var(--bg-main);color:var(--text-main);height:100vh;overflow:hidden}
+    button,input,select{font:inherit}
+    #loginScreen{display:flex;justify-content:center;align-items:center;height:100vh;position:relative;overflow:hidden;min-height:100vh;background:radial-gradient(circle at 15% 15%,rgba(43,126,255,.38),transparent 30%),radial-gradient(circle at 85% 80%,rgba(91,58,255,.38),transparent 32%),linear-gradient(135deg,#020a2d 0%,#062b83 48%,#0b0d38 100%)}
+    #loginScreen:before{content:"";position:absolute;inset:-20%;pointer-events:none;background:radial-gradient(circle at 20% 30%,rgba(0,191,255,.9) 0 2px,transparent 3px),radial-gradient(circle at 75% 25%,rgba(72,120,255,.9) 0 2px,transparent 3px),radial-gradient(circle at 55% 75%,rgba(120,90,255,.8) 0 2px,transparent 3px);background-size:220px 220px,310px 310px,260px 260px;animation:starsMove 18s linear infinite;opacity:.65}
+    @keyframes starsMove{to{transform:translate3d(80px,40px,0)}}
+    .login-shell{position:relative;z-index:2;width:min(470px,92vw);text-align:center}
+    .login-brand{display:flex;align-items:center;justify-content:center;gap:14px;margin-bottom:24px;color:#fff}
+    .login-brand .logo{width:66px;height:66px;border-radius:18px;background:linear-gradient(135deg,#1597ff,#4b42ff);display:flex;align-items:center;justify-content:center;font-size:28px;box-shadow:0 0 35px rgba(0,174,255,.35)}
+    .login-brand h1{font-size:28px;font-weight:800}.login-brand p{margin-top:5px;color:#b9caff;font-size:14px;letter-spacing:2px}
+    .login-box{width:100%;padding:34px;border:1px solid rgba(90,170,255,.38);background:rgba(7,20,65,.68);backdrop-filter:blur(20px);border-radius:28px;box-shadow:0 25px 80px rgba(0,0,0,.42);text-align:left}
+    .login-box h2{color:#fff;text-align:center;font-size:30px;margin-bottom:8px}.login-subtitle{text-align:center;color:#aebee8;margin-bottom:26px}
+    .form-group{margin-bottom:15px}.form-group label{font-size:.85rem;font-weight:600;margin-bottom:6px;display:block}
+    .login-box label{color:#e9efff}.form-group input,.form-group select{width:100%;padding:11px;border:1px solid var(--border);border-radius:8px;font-size:.9rem}
+    .login-box input{background:rgba(3,12,40,.72);color:#fff;border-color:rgba(123,171,255,.28);padding:14px;border-radius:13px;outline:none}
+    .btn-primary{width:100%;background:var(--primary);color:#fff;border:none;padding:12px;border-radius:8px;font-weight:600;cursor:pointer;transition:.2s}
+    .login-box .btn-primary{background:linear-gradient(90deg,#1597ff,#4b42ff);padding:14px;border-radius:13px}
+    .btn-primary:hover{background:var(--primary-hover);transform:translateY(-1px)}
+    .error-msg{color:#ffb4b4;font-size:.8rem;margin-top:10px;display:none;text-align:center}
+    .login-footer{text-align:center;color:#8ea2d4;font-size:12px;margin-top:18px}
+
+    #appDashboard{display:none;height:100vh;width:100vw;position:relative}
+    .sidebar{width:270px;background:var(--bg-sidebar);color:#fff;display:flex;flex-direction:column;padding:20px 0;overflow-y:auto;flex-shrink:0;transition:transform .3s;z-index:1000}
+    .brand{padding:0 20px 20px;font-size:1.25rem;font-weight:800;display:flex;align-items:center;gap:12px}
+    .nav-menu{list-style:none;margin-top:10px;padding:0 12px}.nav-item{padding:12px 16px;font-size:.95rem;cursor:pointer;display:flex;align-items:center;gap:14px;color:#a3aed1;transition:.2s;font-weight:600;border-radius:12px;margin-bottom:6px}
+    .nav-item:hover,.nav-item.active{background:var(--primary);color:#fff}
+    .quick-add{margin:20px 15px;padding:16px;background:rgba(255,255,255,.05);border-radius:14px;border:1px solid rgba(255,255,255,.08)}
+    .quick-add h4{margin-bottom:12px;color:#fff}.quick-add input,.quick-add select{margin-bottom:10px;font-size:.85rem;background:#fff;width:100%;padding:10px;border-radius:8px;border:none;outline:none}
+    .user-profile{padding:15px 20px;display:flex;align-items:center;gap:12px;border-top:1px solid rgba(255,255,255,.08);margin-top:auto}.avatar{width:42px;height:42px;background:#a3aed1;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#0f1424;font-weight:bold;font-size:1.1rem;overflow:hidden}
+    .avatar img{width:100%;height:100%;object-fit:cover}
+    .main-wrapper{flex:1;display:flex;flex-direction:column;overflow-y:auto;width:100%}
+    header{background:#fff;padding:15px 25px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border)}
+    .header-left,.header-right{display:flex;align-items:center;gap:15px}.header-right{gap:20px}.mobile-toggle{display:none;font-size:1.3rem;cursor:pointer;background:none;border:none;color:var(--text-main)}
+    .content-area{padding:25px}.card{background:#fff;padding:20px;border-radius:12px;box-shadow:0 2px 5px rgba(0,0,0,.03);margin-bottom:25px;overflow-x:auto}.card-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:15px}
+    .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:15px}.grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:15px}
+    .editor-toolbar{background:#f8fafc;border:1px solid var(--border);border-bottom:none;padding:8px;border-radius:8px 8px 0 0;display:flex;gap:8px}.editor-toolbar button{padding:4px 8px;background:#fff;border:1px solid var(--border);border-radius:4px;cursor:pointer}
+    .editor-content{min-height:100px;border:1px solid var(--border);border-radius:0 0 8px 8px;padding:10px;background:#fff;outline:none}
+    table{width:100%;border-collapse:collapse;font-size:.85rem;text-align:left;min-width:850px}th{padding:12px;border-bottom:2px solid var(--border);color:var(--text-muted);font-weight:600}td{padding:12px;border-bottom:1px solid var(--border)}
+    .btn-sm{padding:5px 10px;font-size:.75rem;border-radius:6px;border:none;cursor:pointer;color:#fff;margin-right:2px}.btn-edit{background:var(--warning)}.btn-delete{background:var(--danger)}.btn-success{background:var(--success)}
+    .badge{padding:4px 10px;border-radius:12px;font-size:.75rem;font-weight:600;display:inline-block}.badge-high{background:#fee2e2;color:var(--danger)}.badge-medium{background:#fef3c7;color:var(--warning)}.badge-low{background:#d1fae5;color:var(--success)}
+    .status-overdue{background:#fee2e2;color:var(--danger);font-weight:bold;padding:3px 6px;border-radius:4px;font-size:.7rem}.modal-page{display:none}.modal-page.active{display:block}
+    .sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:999}
+    .notif-wrapper{position:relative;cursor:pointer}.notif-bell{font-size:1.2rem}.notif-badge{position:absolute;top:-6px;right:-8px;background:var(--danger);color:#fff;border-radius:50%;padding:2px 6px;font-size:.65rem;font-weight:bold}.notif-dropdown{display:none;position:absolute;right:0;top:35px;width:280px;background:#fff;border:1px solid var(--border);box-shadow:0 5px 15px rgba(0,0,0,.15);border-radius:10px;z-index:1000;padding:10px}.notif-dropdown.show{display:block}.notif-item{padding:8px;border-bottom:1px solid var(--border);font-size:.8rem}
+    .header-profile{display:flex;align-items:center;gap:10px;position:relative}.profile-avatar-container{position:relative;cursor:pointer}.header-avatar{width:40px;height:40px;border-radius:50%;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:bold;object-fit:cover;overflow:hidden}.header-avatar img{width:100%;height:100%;object-fit:cover}
+    .photo-upload-overlay{position:absolute;bottom:0;right:0;background:rgba(0,0,0,.6);color:#fff;border-radius:50%;width:16px;height:16px;display:flex;align-items:center;justify-content:center;font-size:.55rem}
+    .profile-modal{display:none;position:fixed;inset:0;background:rgba(0,8,30,.68);backdrop-filter:blur(10px);z-index:5000;align-items:center;justify-content:center;padding:20px}.profile-modal.show{display:flex}
+    .profile-card{width:min(620px,95vw);background:var(--card-bg);border-radius:24px;box-shadow:0 30px 90px rgba(0,0,0,.35);overflow:hidden}.profile-cover{height:130px;background:linear-gradient(135deg,#071b55,#2148d8,#5b37ff)}
+    .profile-main{padding:0 30px 30px;position:relative}.profile-big-avatar{width:100px;height:100px;border-radius:50%;margin-top:-50px;border:5px solid var(--card-bg);background:linear-gradient(135deg,#1a9cff,#513bff);color:#fff;display:flex;align-items:center;justify-content:center;font-size:38px;font-weight:800;box-shadow:0 12px 30px rgba(40,80,220,.25);object-fit:cover;overflow:hidden}.profile-big-avatar img{width:100%;height:100%;object-fit:cover}
+    .profile-top{display:flex;justify-content:space-between;align-items:flex-end;gap:15px}.profile-top h2{margin:12px 0 4px;font-size:25px}.profile-role{color:var(--text-muted);font-size:13px}.profile-close{border:0;background:var(--bg-main);width:38px;height:38px;border-radius:50%;cursor:pointer;color:var(--text-main);font-size:18px}
+    .profile-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:25px}.profile-info{padding:16px;border:1px solid var(--border);border-radius:14px;background:rgba(0,0,0,.015)}.profile-info .label{font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:var(--text-muted);margin-bottom:6px}.profile-info .value{font-weight:700;color:var(--text-main);word-break:break-word}.profile-actions{display:flex;gap:10px;margin-top:20px}.profile-actions button{flex:1;padding:12px;border:0;border-radius:12px;font-weight:700;cursor:pointer}.profile-actions .primary{background:var(--primary);color:#fff}.profile-actions .secondary{background:var(--bg-main);color:var(--text-main)}
+    .toast{position:fixed;right:20px;bottom:20px;background:#172033;color:#fff;padding:12px 16px;border-radius:10px;z-index:9999;box-shadow:0 10px 30px rgba(0,0,0,.2);display:none}.toast.show{display:block}
+    @media(max-width:768px){.mobile-toggle{display:block}.sidebar{position:fixed;top:0;left:0;height:100vh;transform:translateX(-100%)}.sidebar.open{transform:translateX(0)}.sidebar-overlay.active{display:block}.grid-2,.grid-3{grid-template-columns:1fr}.content-area{padding:15px}header{padding:12px 15px}.header-right>div:nth-child(2)>div:last-child{display:none}.profile-grid{grid-template-columns:1fr}.profile-main{padding:0 20px 24px}}
+    
+.owner-only.hidden-by-role{display:none!important}
+.department-badge{display:inline-flex;align-items:center;gap:6px;padding:4px 9px;border-radius:999px;background:#eaf3ff;color:#1d4ed8;font-size:.68rem;font-weight:700;margin-top:3px}
+.login-department{display:none;margin:14px auto 0;width:max-content;max-width:100%;padding:7px 12px;border:1px solid rgba(125,211,252,.3);border-radius:999px;color:#7dd3fc;font-size:12px;font-weight:700}
+@media(max-width:600px){.login-box{padding:24px}.login-brand h1{font-size:21px}.login-brand .logo{width:54px;height:54px}.header-right{gap:10px}.content-area{padding:10px}.card{padding:15px}}
   
-/* ===== PREMIUM LOGIN EXPERIENCE ===== */
-#loginScreen{
-  position:relative; overflow:hidden; min-height:100vh;
-  background:radial-gradient(circle at 15% 15%, rgba(43,126,255,.38), transparent 30%),
-             radial-gradient(circle at 85% 80%, rgba(91,58,255,.38), transparent 32%),
-             linear-gradient(135deg,#020a2d 0%,#062b83 48%,#0b0d38 100%);
-}
-#loginScreen::before,#loginScreen::after{content:"";position:absolute;inset:-20%;pointer-events:none}
-#loginScreen::before{background:
- radial-gradient(circle at 20% 30%,rgba(0,191,255,.9) 0 2px,transparent 3px),
- radial-gradient(circle at 75% 25%,rgba(72,120,255,.9) 0 2px,transparent 3px),
- radial-gradient(circle at 55% 75%,rgba(120,90,255,.8) 0 2px,transparent 3px);
- background-size:220px 220px,310px 310px,260px 260px;animation:starsMove 18s linear infinite;opacity:.65}
-#loginScreen::after{background:linear-gradient(120deg,transparent 20%,rgba(0,170,255,.13) 42%,transparent 60%);transform:rotate(-12deg);animation:aurora 10s ease-in-out infinite alternate}
-@keyframes starsMove{to{transform:translate3d(80px,40px,0)}}
-@keyframes aurora{from{transform:translateX(-8%) rotate(-12deg)}to{transform:translateX(12%) rotate(-12deg)}}
-.login-orb{position:absolute;border-radius:50%;filter:blur(1px);opacity:.65;pointer-events:none}
-.login-orb.o1{width:420px;height:420px;left:-180px;top:-170px;background:radial-gradient(circle,rgba(0,153,255,.55),transparent 68%);animation:orb1 9s ease-in-out infinite}
-.login-orb.o2{width:360px;height:360px;right:-140px;bottom:-100px;background:radial-gradient(circle,rgba(95,65,255,.5),transparent 70%);animation:orb2 11s ease-in-out infinite}
-@keyframes orb1{50%{transform:translate(60px,45px) scale(1.12)}}
-@keyframes orb2{50%{transform:translate(-55px,-35px) scale(1.15)}}
-.login-shell{position:relative;z-index:2;width:min(470px,92vw);text-align:center}
-.login-brand{display:flex;align-items:center;justify-content:center;gap:14px;margin-bottom:24px;color:#fff}
-.login-brand img{width:66px;height:66px;border-radius:18px;object-fit:cover;box-shadow:0 0 35px rgba(0,174,255,.35);background:#fff}
-.login-brand h1{font-size:28px;letter-spacing:.4px;margin:0;font-weight:800;text-shadow:0 3px 25px rgba(0,0,0,.35)}
-.login-brand p{margin-top:5px;color:#b9caff;font-size:14px;letter-spacing:2px}
-.login-box{width:100%;padding:34px;border:1px solid rgba(90,170,255,.38);background:rgba(7,20,65,.68);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-radius:28px;box-shadow:0 25px 80px rgba(0,0,0,.42),inset 0 1px 0 rgba(255,255,255,.08);text-align:left}
-.login-box h2{color:#fff;text-align:center;font-size:30px;margin-bottom:8px}.login-subtitle{text-align:center;color:#aebee8;margin-bottom:26px}
-.login-box .form-group{margin-bottom:18px}.login-box .form-group label{color:#e9efff;margin-bottom:8px}
-.login-box .form-group input{background:rgba(3,12,40,.72);color:#fff;border:1px solid rgba(123,171,255,.28);padding:14px 15px;border-radius:13px;outline:none;transition:.25s}
-.login-box .form-group input:focus{border-color:#29a9ff;box-shadow:0 0 0 4px rgba(41,169,255,.1)}
-.login-box .btn-primary{background:linear-gradient(90deg,#1597ff,#4b42ff);padding:14px;border-radius:13px;box-shadow:0 12px 28px rgba(52,86,255,.3);font-size:15px}
-.login-box .btn-primary:hover{transform:translateY(-1px);filter:brightness(1.08)}
-.login-footer{text-align:center;color:#8ea2d4;font-size:12px;margin-top:18px}
-/* ===== PROFILE MODAL ===== */
-.profile-modal{display:none;position:fixed;inset:0;background:rgba(0,8,30,.68);backdrop-filter:blur(10px);z-index:5000;align-items:center;justify-content:center;padding:20px}
-.profile-modal.show{display:flex}.profile-card{width:min(620px,95vw);background:var(--card-bg);border-radius:24px;box-shadow:0 30px 90px rgba(0,0,0,.35);overflow:hidden;animation:profileIn .25s ease}
-@keyframes profileIn{from{opacity:0;transform:translateY(18px) scale(.98)}to{opacity:1;transform:none}}
-.profile-cover{height:130px;background:linear-gradient(135deg,#071b55,#2148d8,#5b37ff);position:relative}
-.profile-cover::after{content:"";position:absolute;inset:0;background:radial-gradient(circle at 20% 20%,rgba(255,255,255,.18),transparent 25%),radial-gradient(circle at 80% 70%,rgba(0,196,255,.2),transparent 28%)}
-.profile-main{padding:0 30px 30px;position:relative}.profile-big-avatar{width:100px;height:100px;border-radius:50%;margin-top:-50px;border:5px solid var(--card-bg);background:linear-gradient(135deg,#1a9cff,#513bff);color:#fff;display:flex;align-items:center;justify-content:center;font-size:38px;font-weight:800;box-shadow:0 12px 30px rgba(40,80,220,.25);object-fit:cover}
-.profile-top{display:flex;justify-content:space-between;align-items:flex-end;gap:15px}.profile-top h2{margin:12px 0 4px;font-size:25px}.profile-role{color:var(--text-muted);font-size:13px}.profile-close{border:0;background:var(--bg-main);width:38px;height:38px;border-radius:50%;cursor:pointer;color:var(--text-main);font-size:18px}
-.profile-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:25px}.profile-info{padding:16px;border:1px solid var(--border);border-radius:14px;background:rgba(0,0,0,.015)}.profile-info .label{font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:var(--text-muted);margin-bottom:6px}.profile-info .value{font-weight:700;color:var(--text-main);word-break:break-word}.profile-actions{display:flex;gap:10px;margin-top:20px}.profile-actions button{flex:1;padding:12px;border:0;border-radius:12px;font-weight:700;cursor:pointer}.profile-actions .primary{background:var(--primary);color:#fff}.profile-actions .secondary{background:var(--bg-main);color:var(--text-main)}
-@media(max-width:600px){.login-box{padding:24px}.login-brand h1{font-size:21px}.login-brand img{width:54px;height:54px}.profile-grid{grid-template-columns:1fr}.profile-main{padding:0 20px 24px}}
+    .login-dept-group select{width:100%;background:rgba(3,12,40,.72);color:#fff;border:1px solid rgba(123,171,255,.28);padding:14px 15px;border-radius:13px;outline:none}.login-dept-group select option{color:#111;background:#fff}.login-department{margin-top:8px;color:#7dd3fc;font-weight:700;font-size:13px}
+    .status-saving{font-size:11px;color:#2563eb;margin-left:6px}.status-saved{font-size:11px;color:#16a34a;margin-left:6px}
+
+/* ===== TASK DETAILS / ANNOUNCEMENTS / MOBILE 2.0 ===== */
+.announcement-strip{position:relative;background:linear-gradient(135deg,#0b1d4d,#244bd7);color:#fff;border-radius:18px;padding:16px 18px;margin-bottom:18px;box-shadow:0 10px 30px rgba(37,71,190,.14);overflow:hidden}
+.announcement-strip:after{content:"";position:absolute;width:180px;height:180px;right:-70px;top:-90px;border-radius:50%;background:rgba(255,255,255,.08)}
+.announcement-head{display:flex;justify-content:space-between;align-items:center;gap:10px;position:relative;z-index:1}.announcement-head h3{font-size:15px}.announcement-head button{border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.1);color:#fff;border-radius:9px;padding:7px 10px;cursor:pointer;font-size:12px}.announcement-list{display:flex;gap:12px;overflow-x:auto;scrollbar-width:thin;padding-top:12px;position:relative;z-index:1}.announcement-card{min-width:270px;max-width:380px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.15);border-radius:14px;padding:13px}.announcement-card .ann-type{font-size:10px;text-transform:uppercase;letter-spacing:.8px;opacity:.75}.announcement-card h4{font-size:14px;margin:5px 0}.announcement-card .ann-desc{font-size:12px;line-height:1.45;opacity:.92;max-height:60px;overflow:hidden}.announcement-card small{display:block;margin-top:8px;opacity:.7}.announcement-empty{font-size:12px;opacity:.75;padding:5px 0}
+.task-row{cursor:pointer;transition:.15s}.task-row:hover{background:#f7f9ff}.task-row td:first-child{border-left:3px solid transparent}.task-row:hover td:first-child{border-left-color:var(--primary)}
+.task-modal{display:none;position:fixed;inset:0;background:rgba(3,10,35,.68);backdrop-filter:blur(8px);z-index:7000;align-items:center;justify-content:center;padding:14px}.task-modal.show{display:flex}.task-modal-card{width:min(760px,96vw);max-height:92vh;overflow:auto;background:#fff;border-radius:22px;box-shadow:0 30px 90px rgba(0,0,0,.35)}.task-modal-cover{padding:22px;background:linear-gradient(135deg,#071b55,#3157e8,#5b37ff);color:#fff}.task-modal-cover .mini{font-size:11px;opacity:.75;text-transform:uppercase;letter-spacing:1px}.task-modal-cover h2{margin-top:5px;font-size:24px}.task-modal-body{padding:20px}.task-detail-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.task-detail{border:1px solid var(--border);border-radius:13px;padding:13px;background:#fbfcff}.task-detail .label{font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.7px;margin-bottom:5px}.task-detail .value{font-weight:700;word-break:break-word}.task-description{margin-top:14px;border:1px solid var(--border);border-radius:14px;padding:16px;line-height:1.55;overflow-wrap:anywhere}.task-description img{max-width:100%}.task-modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}.announcement-editor{min-height:150px;border:1px solid var(--border);border-radius:0 0 10px 10px;padding:12px;background:#fff;outline:none}.announcement-type-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}.event-chip{border:1px solid var(--border);background:#fff;border-radius:10px;padding:9px 7px;text-align:center;cursor:pointer;font-size:11px}.event-chip.active{border-color:var(--primary);background:#eef0ff;color:var(--primary);font-weight:700}.announcement-modal .profile-card{width:min(720px,96vw)}
+.team-list-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}.team-person{border:1px solid var(--border);border-radius:16px;padding:15px;background:#fff;display:flex;gap:12px;align-items:center}.team-person .team-avatar{width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,#1597ff,#4b42ff);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;flex:none;overflow:hidden}.team-avatar img{width:100%;height:100%;object-fit:cover}.team-person h4{font-size:14px}.team-person p{font-size:11px;color:var(--text-muted);margin-top:2px}.team-person .dept{display:inline-block;margin-top:5px;font-size:10px;font-weight:700;color:#1d4ed8;background:#eaf3ff;padding:3px 7px;border-radius:99px}
+.mobile-bottom-safe{height:10px}
+@media(max-width:900px){.team-list-grid{grid-template-columns:1fr 1fr}.task-detail-grid{grid-template-columns:1fr 1fr}.announcement-type-grid{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:600px){body{overflow:hidden}.main-wrapper{min-width:0}.content-area{padding:9px}.card{padding:13px;border-radius:15px;margin-bottom:12px}.card-header{gap:8px}.card-header h3{font-size:15px}header{min-height:58px}.header-right{gap:7px}.header-profile>div:last-child{display:none}.notif-dropdown{position:fixed;right:8px;top:62px;width:min(330px,calc(100vw - 16px))}.header-avatar{width:36px;height:36px}.mobile-toggle{font-size:1.1rem}.sidebar{width:86vw;max-width:320px}.task-modal{padding:8px}.task-modal-card{border-radius:17px;max-height:95vh}.task-modal-cover{padding:17px}.task-modal-cover h2{font-size:20px}.task-modal-body{padding:13px}.task-detail-grid{grid-template-columns:1fr 1fr;gap:8px}.task-detail{padding:10px}.task-detail .value{font-size:12px}.task-description{padding:12px;font-size:13px}.announcement-strip{border-radius:14px;padding:13px}.announcement-card{min-width:245px}.team-list-grid{grid-template-columns:1fr}.grid-2,.grid-3{gap:8px}.form-group{margin-bottom:11px}table{min-width:720px;font-size:12px}.btn-sm{padding:5px 7px}.announcement-type-grid{grid-template-columns:repeat(2,1fr)}}
+
+
+.mobile-task-card{background:#fff;border:1px solid var(--border);border-radius:15px;padding:13px;margin-bottom:10px;box-shadow:0 4px 14px rgba(20,35,70,.05)}.mobile-task-top{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}.mobile-task-title{font-weight:800;font-size:14px}.mobile-task-id{font-size:10px;color:var(--text-muted);margin-top:3px}.mobile-task-meta{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin:11px 0}.mobile-task-meta div{background:#f7f9fc;border-radius:9px;padding:8px}.mobile-task-meta span{display:block;font-size:9px;color:var(--text-muted);text-transform:uppercase}.mobile-task-meta b{font-size:11px}.mobile-task-bottom{display:flex;align-items:center;gap:8px}.mobile-task-bottom select{flex:1;padding:8px;border:1px solid var(--border);border-radius:9px}.mobile-task-bottom button{border:0;border-radius:9px;padding:8px 10px;background:#eef0ff;color:var(--primary)}
+@media(max-width:600px){#dashboardTaskTable{display:none}#mobileTaskList{display:block!important}#dashboard-page .card-header .btn-success{padding:6px 8px}.mobile-task-bottom .btn-sm{margin:0}}
+
+
+.hidden-by-role{display:none!important}
+.task-row{cursor:pointer}.task-row:hover{background:#f8faff}
+.task-modal{display:none;position:fixed;inset:0;background:rgba(3,10,35,.68);backdrop-filter:blur(8px);z-index:6000;align-items:center;justify-content:center;padding:16px}.task-modal.show{display:flex}.task-modal-card{width:min(760px,96vw);max-height:92vh;overflow:auto;background:#fff;border-radius:24px;box-shadow:0 30px 90px rgba(0,0,0,.35)}.task-modal-cover{padding:24px 28px;background:linear-gradient(135deg,#081b55,#254bd7,#5b37ff);color:#fff}.task-modal-cover .mini{font-size:11px;letter-spacing:1px;opacity:.75}.task-modal-body{padding:24px}.task-detail-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.task-detail{padding:13px;border:1px solid var(--border);border-radius:13px;background:#fafbff}.task-detail .label{text-transform:uppercase;font-size:10px;letter-spacing:.7px;color:var(--text-muted);margin-bottom:5px}.task-detail .value{font-weight:700;font-size:13px;word-break:break-word}.task-description{margin-top:16px;padding:17px;border:1px solid var(--border);border-radius:14px;line-height:1.6;background:#fbfcff;overflow-wrap:anywhere}.task-modal-actions{display:flex;gap:8px;margin-top:16px}.mobile-task-card{background:#fff;border:1px solid var(--border);border-radius:16px;padding:15px;margin-bottom:12px;box-shadow:0 4px 14px rgba(0,0,0,.04);cursor:pointer}.mobile-task-top{display:flex;justify-content:space-between;gap:10px}.mobile-task-title{font-weight:800;font-size:14px}.mobile-task-id{font-size:11px;color:var(--text-muted);margin-top:3px}.mobile-task-meta{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:14px 0}.mobile-task-meta span{display:block;font-size:10px;color:var(--text-muted);text-transform:uppercase}.mobile-task-meta b{font-size:12px}.mobile-task-bottom{display:flex;gap:8px}.mobile-task-bottom select{flex:1;padding:8px;border:1px solid var(--border);border-radius:9px}.mobile-task-bottom button{width:42px;border:0;border-radius:9px;background:var(--primary);color:#fff}.dashboard-welcome{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:18px}.greeting h1{font-size:25px;margin-bottom:5px}.greeting p{color:var(--text-muted);font-size:13px}.dashboard-dept{padding:10px 14px;border-radius:14px;background:#fff;border:1px solid var(--border);font-weight:700;font-size:12px}.stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px}.stat-card{background:#fff;border:1px solid var(--border);border-radius:16px;padding:17px;cursor:pointer;box-shadow:0 3px 12px rgba(0,0,0,.03);transition:.2s}.stat-card:hover{transform:translateY(-2px);box-shadow:0 10px 25px rgba(0,0,0,.06)}.stat-card .icon{width:38px;height:38px;border-radius:11px;display:flex;align-items:center;justify-content:center;background:#eef2ff;color:var(--primary);margin-bottom:10px}.stat-card .num{font-size:25px;font-weight:800}.stat-card .label{font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.6px;margin-top:3px}.report-export-card{border-radius:22px;padding:18px;background:linear-gradient(145deg,#f7faff 0%,#eef3ff 48%,#f8f5ff 100%);border:1px solid #000080;box-shadow:0 14px 35px rgba(37,75,215,.08)}.report-hero{display:flex;align-items:center;gap:12px;margin-bottom:16px}.report-hero-icon{width:48px;height:48px;border-radius:15px;background:linear-gradient(135deg,#1597ff,#5b37ff);color:#fff;display:flex;align-items:center;justify-content:center;font-size:20px;box-shadow:0 10px 22px rgba(65,75,220,.22)}.report-hero h3{font-size:18px}.report-hero p{font-size:11px;color:var(--text-muted);margin-top:3px}.report-filters{display:grid;grid-template-columns:1.3fr 1fr auto auto auto;gap:10px;align-items:end}.report-filters label{font-size:11px;color:var(--text-muted);font-weight:700;display:block;margin-bottom:5px}.report-filters select{width:100%;padding:11px;border:1px solid #cfd9ef;border-radius:11px;background:#fff}.report-btn{border:0;border-radius:11px;padding:11px 14px;color:#fff;font-weight:800;cursor:pointer;white-space:nowrap;box-shadow:0 7px 16px rgba(20,35,70,.09);transition:.18s}.report-btn:hover{transform:translateY(-1px)}.report-btn.pdf{background:linear-gradient(135deg,#ef4444,#b91c1c)}.report-btn.excel{background:linear-gradient(135deg,#16a34a,#087f3d)}.report-btn.csv{background:linear-gradient(135deg,#2563eb,#4f46e5)}.report-note{margin-top:12px;padding:10px 12px;border-radius:11px;background:rgba(255,255,255,.75);border:1px solid #dce5ff;color:#52627d;font-size:10px}.report-note i{color:#3157e8;margin-right:4px} .report-summary{margin-top:15px;display:flex;gap:10px;flex-wrap:wrap}.summary-pill{padding:8px 11px;border-radius:10px;background:#fff;border:1px solid #dbe3f3;font-size:12px;font-weight:800}.followup-note{font-size:11px;color:var(--text-muted);margin-top:5px}
+    .multi-assignee{position:relative;width:100%}.multi-assignee-trigger{width:100%;min-height:44px;padding:11px 13px;border:1px solid var(--border);border-radius:10px;background:#fff;color:var(--text-main);display:flex;align-items:center;justify-content:space-between;gap:10px;cursor:pointer;text-align:left}.multi-assignee-trigger:hover{border-color:#9bb5ef}.multi-assignee-trigger i{color:var(--text-muted);font-size:12px;transition:.18s}.multi-assignee.open .multi-assignee-trigger i{transform:rotate(180deg)}.multi-assignee-menu{display:none;position:absolute;left:0;right:0;top:calc(100% + 6px);background:#fff;border:1px solid #d9e1ef;border-radius:13px;box-shadow:0 18px 45px rgba(20,35,70,.18);padding:7px;z-index:3500;max-height:270px;overflow:auto}.multi-assignee.open .multi-assignee-menu{display:block}.assignee-option{display:flex;align-items:center;gap:10px;padding:10px 9px;border-radius:9px;cursor:pointer;transition:.15s}.assignee-option:hover{background:#f3f6ff}.assignee-option input{width:17px;height:17px;accent-color:var(--primary);cursor:pointer;flex:0 0 auto}.assignee-option span{font-size:13px;font-weight:600;color:var(--text-main)}.assignee-empty{padding:14px;text-align:center;color:var(--text-muted);font-size:12px}.assignee-selected-count{margin-top:6px;font-size:11px;color:var(--text-muted)}.assignee-selected-count i{margin-right:4px;color:var(--primary)}
+    .report-filters>div{min-width:0}.report-filters select{min-height:44px}.report-btn{min-height:44px}.report-export-card{overflow:visible}
+
+@media(max-width:900px){.stat-grid{grid-template-columns:repeat(2,1fr)}.task-detail-grid{grid-template-columns:1fr 1fr}.report-filters{grid-template-columns:1fr 1fr}.report-btn{width:100%}.dashboard-welcome{align-items:flex-start;flex-direction:column}}
+@media(max-width:768px){body{overflow:auto}.content-area{padding:14px}.content-area .card{padding:15px}.header-right{gap:9px}.header-right .header-profile>div:last-child,.header-right .header-profile p:not(:first-child){display:none}.header-right>button{padding:7px 10px!important}.header-profile{gap:4px}.announcement-list{margin-right:-5px}.announcement-card{min-width:240px}.stat-grid{gap:9px}.stat-card{padding:13px}.stat-card .num{font-size:21px}.greeting h1{font-size:21px}.task-detail-grid{grid-template-columns:1fr}.task-modal-card{border-radius:18px}.report-filters{grid-template-columns:1fr}.report-btn{width:100%}}
 
   
-.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:15px;margin-bottom:20px}
-.stat-card{background:#fff;border-radius:16px;box-shadow:0 8px 30px rgba(24,39,75,.07);padding:18px;cursor:pointer;transition:.2s;border:1px solid transparent}
-.stat-card:hover{transform:translateY(-2px);border-color:#4318ff}.stat-card i{color:#4318ff;font-size:22px;display:block;margin-bottom:10px}.stat-card strong{font-size:28px;display:block}.stat-card span{color:#8b95a7;font-size:12px}
-.task-details-modal{display:none;position:fixed;inset:0;background:rgba(2,8,28,.72);backdrop-filter:blur(7px);z-index:7000;align-items:center;justify-content:center;padding:18px}
-.task-details-modal.show{display:flex}.task-details-card{width:min(900px,96vw);max-height:92vh;overflow:auto;background:#fff;border-radius:22px;padding:24px;box-shadow:0 30px 100px rgba(0,0,0,.35)}
-.modal-title-row{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:18px}.modal-title-row small{color:#6d28d9;font-weight:800}.modal-title-row h2{margin-top:4px}.modal-close{width:38px;height:38px;border:0;border-radius:50%;background:#f1f5f9;font-size:24px;cursor:pointer}
-.task-detail-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.task-detail-item{border:1px solid #e5e7eb;border-radius:12px;padding:12px}.task-detail-item small{display:block;color:#8b95a7;text-transform:uppercase;font-size:10px;margin-bottom:5px}.task-detail-block{border:1px solid #e5e7eb;border-radius:12px;padding:14px;margin-top:12px}.task-detail-block h4{margin-bottom:8px}.team-chip{display:inline-flex;align-items:center;gap:7px;padding:7px 10px;background:#f5f7ff;border-radius:20px;margin:3px;font-size:12px}.team-chip .mini-avatar{width:25px;height:25px;border-radius:50%;display:grid;place-items:center;background:#4318ff;color:#fff;font-weight:800;font-size:10px;overflow:hidden}.team-chip img{width:100%;height:100%;object-fit:cover}
-.stats-grid+.card{margin-top:0}.report-controls{display:flex;gap:10px;align-items:end;flex-wrap:wrap}.report-controls .form-group{min-width:150px}.notice-box{background:#eef5ff;color:#244a9b;padding:11px;border-radius:10px;font-size:12px;margin-bottom:14px}.member-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:15px}.member-tile{border:1px solid #e5e7eb;border-radius:14px;padding:16px}.member-photo{width:62px;height:62px;border-radius:50%;background:#4318ff;color:#fff;display:grid;place-items:center;font-weight:800;font-size:20px;overflow:hidden;margin-bottom:10px}.member-photo img{width:100%;height:100%;object-fit:cover}.announcement-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px}.announcement-card{background:#fff;border:1px solid #e5e7eb;border-radius:16px;padding:18px;box-shadow:0 8px 30px rgba(24,39,75,.05)}.announcement-cat{color:#6d28d9;font-size:11px;font-weight:800;text-transform:uppercase}.announcement-body{line-height:1.6;margin:11px 0}.reaction-btn{border:1px solid #e5e7eb;background:#fff;border-radius:20px;padding:7px 11px;cursor:pointer}.hidden{display:none!important}.table-scroll{overflow:auto}
-@media(max-width:900px){.stats-grid{grid-template-columns:1fr 1fr}.member-grid,.announcement-grid{grid-template-columns:1fr 1fr}.task-detail-grid{grid-template-columns:1fr 1fr}}
-@media(max-width:600px){.stats-grid,.member-grid,.announcement-grid,.task-detail-grid{grid-template-columns:1fr}}
-</style>
-
-<style id="dynamic-employee-profile-css">
-/* Dynamic employee identity */
-.user-card { cursor:pointer; transition:.25s ease; }
-.user-card:hover { background:rgba(255,255,255,.08); transform:translateY(-1px); }
-.user-avatar-wrap { position:relative; flex:0 0 auto; }
-.user-avatar-img {
-  width:42px;height:42px;border-radius:50%;object-fit:cover;
-  display:none;border:2px solid rgba(255,255,255,.65);
-}
-.user-avatar-fallback {
-  width:42px;height:42px;border-radius:50%;display:flex;align-items:center;justify-content:center;
-  background:linear-gradient(135deg,#5b2cff,#1677ff);color:#fff;font-weight:800;font-size:16px;
-}
-.user-avatar-camera {
-  position:absolute;right:-2px;bottom:-2px;width:16px;height:16px;border-radius:50%;
-  background:#fff;color:#1d4ed8;font-size:9px;display:flex;align-items:center;justify-content:center;
-  box-shadow:0 2px 6px rgba(0,0,0,.3);
-}
-#employeeProfileModal {
-  position:fixed;inset:0;background:rgba(2,8,28,.72);backdrop-filter:blur(10px);
-  display:none;align-items:center;justify-content:center;z-index:99999;padding:20px;
-}
-#employeeProfileModal.show { display:flex; }
-.employee-profile-card {
-  width:min(560px,96vw);max-height:92vh;overflow:auto;border-radius:26px;
-  background:linear-gradient(145deg,rgba(16,35,82,.98),rgba(7,18,48,.98));
-  border:1px solid rgba(83,155,255,.45);box-shadow:0 30px 100px rgba(0,0,0,.5);
-  color:#fff;padding:28px;position:relative;
-}
-.profile-close { position:absolute;right:18px;top:16px;border:0;background:rgba(255,255,255,.08);color:#fff;
-  width:38px;height:38px;border-radius:50%;font-size:20px;cursor:pointer; }
-.profile-top { text-align:center;padding:8px 0 22px; }
-.profile-photo-box { position:relative;width:104px;height:104px;margin:0 auto 12px; }
-.profile-photo {
-  width:104px;height:104px;border-radius:50%;object-fit:cover;border:4px solid #4d8dff;
-  background:linear-gradient(135deg,#4d8dff,#6d38ff);
-}
-.profile-photo-fallback { width:104px;height:104px;border-radius:50%;display:flex;align-items:center;justify-content:center;
-  background:linear-gradient(135deg,#4d8dff,#6d38ff);font-size:38px;font-weight:800; }
-.photo-edit-btn { position:absolute;right:0;bottom:0;width:34px;height:34px;border:2px solid #0a183d;
-  border-radius:50%;background:#1683ff;color:#fff;cursor:pointer; }
-.profile-top h2 { margin:8px 0 3px;font-size:24px; }
-.profile-top p { margin:0;color:#9fb3d7; }
-.profile-grid { display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px; }
-.profile-field label { display:block;color:#9fb3d7;font-size:12px;margin-bottom:6px; }
-.profile-field input {
-  width:100%;box-sizing:border-box;padding:12px 13px;border-radius:12px;border:1px solid rgba(122,164,226,.25);
-  background:rgba(255,255,255,.055);color:#fff;outline:none;
-}
-.profile-field input:focus { border-color:#3f8cff;box-shadow:0 0 0 3px rgba(63,140,255,.12); }
-.profile-actions { display:flex;gap:10px;margin-top:20px; }
-.profile-actions button { flex:1;padding:12px;border-radius:12px;border:0;font-weight:700;cursor:pointer; }
-.profile-save { background:linear-gradient(90deg,#1683ff,#6337ff);color:#fff; }
-.profile-cancel { background:rgba(255,255,255,.08);color:#fff; }
-.profile-note { margin-top:10px;color:#7f96bf;font-size:11px;text-align:center; }
-@media(max-width:600px){ .profile-grid{grid-template-columns:1fr;} .employee-profile-card{padding:22px;} }
-</style>
-
-<style>
-.multi-assignee-trigger{width:100%;display:flex;justify-content:space-between;align-items:center;padding:11px 12px;border:1px solid var(--border);border-radius:8px;background:#fff;cursor:pointer;font-weight:600;color:var(--text-main);}.multi-assignee-trigger span{font-size:.75rem;color:var(--primary);}.assignee-picker{margin-top:6px;max-height:220px;overflow:auto;border:1px solid var(--border);border-radius:8px;background:#fff;padding:6px;box-shadow:0 8px 24px rgba(0,0,0,.08);}.assignee-check-row{display:flex;gap:9px;align-items:center;padding:9px 8px;border-radius:6px;cursor:pointer;}.assignee-check-row:hover{background:#f5f7ff;}#fullAssignee{display:none;}#fullDepartment{width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;background:#fff;margin:5px 0 10px;}
+    @media(max-width:768px){.report-export-card{padding:14px;border-radius:17px}.report-hero{align-items:flex-start}.report-hero-icon{width:42px;height:42px;flex:0 0 42px}.report-hero h3{font-size:16px}.report-filters{display:grid;grid-template-columns:1fr;gap:9px}.report-filters>div,.report-btn{width:100%}.report-btn{min-height:46px;font-size:13px}.report-summary{display:grid;grid-template-columns:1fr 1fr;gap:7px}.summary-pill{text-align:center;font-size:11px;padding:9px 7px}.report-note{font-size:10px;line-height:1.5}.multi-assignee-menu{position:fixed;left:12px;right:12px;top:auto;max-height:55vh}.multi-assignee-trigger{min-height:46px}.assignee-option{padding:12px 9px}.assignee-option input{width:19px;height:19px}}
+    @media(max-width:380px){.report-summary{grid-template-columns:1fr}.report-hero p{font-size:10px}}
 </style>
 </head>
-
 <body>
 
-  <!-- PREMIUM LOGIN SCREEN -->
-  <div id="loginScreen">
-    <div class="login-orb o1"></div><div class="login-orb o2"></div>
-    <div class="login-shell">
-      <div class="login-brand">
-        <img src="data:image/png;base64,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" alt="Task Command Icon">
-        <div><h1>TASK COMMAND SYSTEM</h1><p>PLAN • TRACK • ACHIEVE</p></div>
+<div id="loginScreen">
+  <div class="login-shell">
+    <div class="login-brand">
+      <div class="logo"><i class="fas fa-list-check"></i></div>
+      <div><h1>TASK COMMAND</h1><p>TEAM MANAGEMENT SYSTEM</p></div>
+    </div>
+    <div class="login-box">
+      <h2>Welcome Back</h2>
+      <div class="login-subtitle">Sign in with your Employee ID & Password</div>
+      <div class="form-group">
+        <label>Employee ID</label>
+        <input type="text" id="loginEmployeeId" placeholder="e.g. denisha" autocomplete="username">
       </div>
-      <div class="login-box">
-        <h2>Welcome Back!</h2>
-        <div class="login-subtitle">Please login to continue</div>
-        <div class="form-group"><label>Your Name / Employee ID</label><input type="text" id="loginEmployeeId" placeholder="Enter your ID or Name" autocomplete="username"></div>
-        <div class="form-group"><label>Password</label><input type="password" id="loginPassword" value="shakti@123" autocomplete="current-password"></div>
-        <div class="form-group"><label>Department</label><select id="loginDepartmentSelect" style="width:100%;padding:12px;border:1px solid var(--border);border-radius:10px;background:#eaf1ff;color:#111827;font-size:15px"><option value="">Select Department</option><option value="Amazon">Amazon</option><option value="Flipkart">Flipkart</option><option value="Operations">Operations</option><option value="Sales">Sales</option><option value="HR">HR</option><option value="Other">Other</option></select></div>
-        <button class="btn-primary" onclick="handleLogin()"><i class="fas fa-arrow-right-to-bracket"></i>&nbsp; LOGIN</button>
-        <div class="error-msg" id="loginError">Invalid Name or Password!</div>
-        <div class="login-footer">© 2026 Task Command System • Secure Workspace</div>
+      <div class="form-group">
+        <label>Password</label>
+        <input type="password" id="loginPassword" placeholder="e.g. denisha@123" autocomplete="current-password">
+        <small style="display:block;margin-top:6px;color:#8ea2d4;font-size:11px;">Default password: Employee ID + @123</small>
+      </div>
+      <div class="form-group login-dept-group"><label>Department</label><select id="loginDepartmentSelect" required><option value="">-- Select Department --</option><option value="Amazon">Amazon</option><option value="Flipkart">Flipkart</option><option value="Other">Other</option></select></div>
+      <button class="btn-primary" onclick="login()"><i class="fas fa-right-to-bracket"></i> Login</button>
+      <div class="error-msg" id="loginError"></div>
+      <div class="login-department" id="loginDepartment"></div><div class="login-footer">Your data is securely stored in Supabase.</div>
+    </div>
+  </div>
+</div>
+
+<div id="appDashboard">
+  <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
+  <aside class="sidebar" id="sidebar">
+    <div class="brand"><i class="fas fa-bars"></i> TASK COMMAND</div>
+    <ul class="nav-menu">
+      <li class="nav-item active" id="dashboardNav" onclick="switchTaskFilter('all','Dashboard',this)"><i class="fas fa-home"></i> Dashboard</li>
+      <li class="nav-item" onclick="switchTaskFilter('my','My Tasks',this)"><i class="fas fa-list-check"></i> My Tasks</li>
+      <li class="nav-item owner-only" id="allTasksNav" onclick="switchTaskFilter('all','All Tasks',this)"><i class="fas fa-layer-group"></i> All Tasks</li>
+      <li class="nav-item" onclick="switchTaskFilter('in-progress','In Progress',this)"><i class="fas fa-clock"></i> In Progress</li>
+      <li class="nav-item" onclick="switchTaskFilter('completed','Completed',this)"><i class="fas fa-circle-check"></i> Completed</li>
+      <li class="nav-item" id="assignTaskNav" onclick="switchPage('assign-task-page','Assign Task',this)"><i class="fas fa-plus-circle"></i> Assign Task</li>
+       <li class="nav-item" id="teamNav" onclick="switchPage('team-page','Team Members',this)"><i class="fas fa-users"></i> Team Members</li>
+      <li class="nav-item" id="reportsNav" onclick="switchPage('reports-page','Reports & Export',this)"><i class="fas fa-chart-column"></i> Reports & Export</li>
+      <li class="nav-item owner-only" id="addMemberNav" onclick="switchPage('add-member-page','Add Member',this)"><i class="fas fa-user-plus"></i> Add Member</li>
+    </ul>
+    <div class="quick-add owner-only" id="quickAddBox">
+      <h4>Quick Add Task</h4>
+      <input type="text" id="quickTitle" placeholder="Task Title / Type">
+      <select id="quickDepartment"><option value="">Department</option><option value="Amazon">Amazon</option><option value="Flipkart">Flipkart</option><option value="Other">Other</option></select>
+      <select id="quickAssignee"></select>
+      <select id="quickPriority"><option value="High">High Priority</option><option value="Medium" selected>Medium Priority</option><option value="Low">Low Priority</option></select>
+      <input type="date" id="quickDueDate">
+      <button class="btn-primary" style="padding:10px" onclick="createQuickTask()">+ Add Task</button>
+    </div>
+    <div class="user-profile" onclick="openProfileModal()" title="Open Employee Profile" style="cursor:pointer">
+      <div class="avatar" id="sidebarAvatar">S</div>
+      <div><p style="font-size:.85rem;font-weight:700;color:#fff" id="sidebarUserName">Employee</p><p style="font-size:.72rem;color:#a3aed1" id="sidebarUserRole">Active User</p><p style="font-size:.68rem;color:#7dd3fc" id="sidebarUserDepartment"></p></div>
+    </div>
+  </aside>
+
+  <div class="main-wrapper">
+    <header>
+      <div class="header-left"><button class="mobile-toggle" onclick="toggleSidebar()"><i class="fas fa-bars"></i></button><h3 id="currentPageTitle">Dashboard</h3></div>
+      <div class="header-right">
+        <div class="notif-wrapper" onclick="toggleNotificationDropdown()">
+          <i class="fas fa-bell notif-bell"></i><span class="notif-badge" id="notifCount">0</span>
+          <div class="notif-dropdown" id="notifDropdown"><h4 style="margin-bottom:8px;font-size:.85rem;border-bottom:1px solid var(--border);padding-bottom:5px">Notifications</h4><div id="notifList" style="max-height:200px;overflow-y:auto"></div></div>
+        </div>
+        <div class="header-profile">
+          <div class="profile-avatar-container" onclick="openProfileModal()" title="Open employee profile">
+            <div id="headerAvatar" class="header-avatar">S</div>
+            <div class="photo-upload-overlay" onclick="event.stopPropagation();document.getElementById('profilePhotoInput').click()"><i class="fas fa-camera"></i></div>
+          </div>
+          <input type="file" id="profilePhotoInput" accept="image/*" style="display:none" onchange="uploadProfilePhoto(event)">
+          <div><p style="font-size:.85rem;font-weight:700;color:var(--text-main)" id="userProfileName">Employee</p><p style="font-size:.7rem;color:var(--text-muted)" id="sidebarUserRole2">Active User</p><p style="font-size:.68rem;color:#2563eb" id="headerUserDepartment"></p></div>
+        </div>
+        <button style="background:var(--danger);color:#fff;border:none;padding:7px 16px;border-radius:8px;cursor:pointer;font-weight:600" onclick="logout()">Logout</button>
+      </div>
+    </header>
+
+    <div class="content-area">
+      <div id="dashboardHero">
+        <div class="dashboard-welcome">
+          <div class="greeting"><h1 id="greetingText">Good Morning, Employee 👋</h1><p id="greetingSubtext">Here is your task overview for today.</p></div>
+          <div class="dashboard-dept" id="dashboardDepartment">Department: —</div>
+        </div>
+        <div class="stat-grid">
+          <div class="stat-card" onclick="openCountDetails('open')"><div class="icon"><i class="fas fa-folder-open"></i></div><div class="num" id="countOpen">0</div><div class="label">Open Tasks</div></div>
+          <div class="stat-card" onclick="openCountDetails('pending')"><div class="icon"><i class="fas fa-hourglass-half"></i></div><div class="num" id="countPending">0</div><div class="label">Pending</div></div>
+          <div class="stat-card" onclick="openCountDetails('in-progress')"><div class="icon"><i class="fas fa-spinner"></i></div><div class="num" id="countProgress">0</div><div class="label">In Progress</div></div>
+          <div class="stat-card" onclick="openCountDetails('completed')"><div class="icon"><i class="fas fa-circle-check"></i></div><div class="num" id="countCompleted">0</div><div class="label">Completed</div></div>
+        </div>
+      </div>
+      <section class="announcement-strip" id="announcementStrip">
+        <div class="announcement-head">
+          <h3><i class="fas fa-bullhorn"></i> Company Updates & Announcements</h3>
+          <button class="owner-only" id="postAnnouncementBtn" onclick="openAnnouncementModal()"><i class="fas fa-plus"></i> Post</button>
+        </div>
+        <div class="announcement-list" id="announcementList"><div class="announcement-empty">No announcements yet.</div></div>
+      </section>
+      <div id="dashboard-page" class="modal-page active">
+        <div class="card">
+          <div class="card-header"><h3 id="taskTableHeading">Live Task List</h3><button class="btn-sm btn-success" onclick="loadData()"><i class="fas fa-rotate"></i> Refresh</button></div>
+          <table><thead><tr><th>Task ID</th><th>Task Type</th><th>Assigned To</th><th>Priority</th><th>Deadline</th><th>Status Track</th><th>Completion Time</th><th>Actions</th></tr></thead><tbody id="dashboardTaskTable"></tbody></table>
+          <div id="mobileTaskList" style="display:none"></div>
+        </div>
+      </div>
+
+      <div id="assign-task-page" class="modal-page">
+        <div class="card">
+          <div class="card-header"><h2 id="taskFormTitle"><i class="fas fa-tasks"></i> Assign New Task</h2></div>
+          <form onsubmit="submitFullTask(event)">
+            <input type="hidden" id="editTaskId">
+            <div class="grid-2">
+              <div class="form-group"><label>Department</label><select id="fullTaskDepartment" required><option value="">-- Select Department --</option><option value="Amazon">Amazon</option><option value="Flipkart">Flipkart</option><option value="Other">Other</option></select></div>
+              <div class="form-group"><label>Select Task Type</label><select id="fullTaskType" required>
+                <option value="" disabled selected>-- Choose Task Type --</option>
+                <optgroup label="Operations Modules"><option>CATALOGUE</option><option>SALES</option><option>INVENTORY</option><option>PURCHASE ORDER (PO)</option><option>APPOINTMENTS</option></optgroup>
+                <optgroup label="Reports"><option>DOWNLOAD SALES REPORT</option><option>DOWNLOAD ADVERTISEMENT REPORT</option><option>AMAZON PI KW REPORTS DOWNLOAD</option><option>AMAZON PI ACCOUNT ACCESS & SETTINGS</option></optgroup>
+                <optgroup label="Orders & Account Health"><option>CHECK ORDERS</option><option>SELLER FULFILLED RETURNS</option><option>CHECK ACCOUNT HEALTH</option><option>CHECK PERFORMANCE NOTIFICATION</option><option>CUSTOMER REVIEWS</option><option>GMAIL</option><option>TOP ASIN LISTING & PRICE</option><option>BUYER MESSAGE</option><option>ADVERTISEMENT</option><option>CASE</option></optgroup>
+              </select></div>
+              <div class="form-group assignee-field"><label>Assign To (Team Member)</label><select id="fullAssignee" multiple aria-hidden="true" tabindex="-1" style="display:none;"></select><div class="multi-assignee" id="multiAssignee"><button type="button" class="multi-assignee-trigger" id="multiAssigneeTrigger" onclick="toggleAssigneePicker(event)"><span id="multiAssigneeText">-- Select Member --</span><i class="fas fa-chevron-down"></i></button><div class="multi-assignee-menu" id="multiAssigneeMenu"></div></div><div class="assignee-selected-count" id="assigneeSelectedCount"><i class="fas fa-users"></i> Select one or more employees</div></div>
+            </div>
+            <div class="grid-3">
+              <div class="form-group"><label>Priority</label><select id="fullPriority"><option>High</option><option selected>Medium</option><option>Low</option></select></div>
+              <div class="form-group"><label>Set Deadline Date</label><input type="date" id="fullDeadline" required></div>
+              <div class="form-group"><label>Set Reminder Date & Time</label><input type="datetime-local" id="fullReminder"></div>
+            </div>
+            <div class="form-group"><label>Follow-up Person <span style="font-weight:400;color:var(--text-muted)">(Optional)</span></label><select id="fullFollowUp"><option value="">-- No Follow-up --</option></select><div class="followup-note">A notification will be sent to the selected follow-up person.</div></div>
+            <div class="form-group"><label>Task Description & Instructions</label><div class="editor-toolbar"><button type="button" onclick="execCmd('bold')"><i class="fas fa-bold"></i></button><button type="button" onclick="execCmd('italic')"><i class="fas fa-italic"></i></button><button type="button" onclick="execCmd('underline')"><i class="fas fa-underline"></i></button></div><div class="editor-content" id="fullDescription" contenteditable="true"></div></div>
+            <div class="form-group"><label><i class="fas fa-paperclip"></i> Attach File / Document</label><input type="file" id="fullTaskFile" style="padding:8px;background:#fff;border:1px solid var(--border);border-radius:8px;width:100%"></div>
+            <button type="submit" class="btn-primary" style="margin-top:10px" id="saveTaskBtn"><i class="fas fa-paper-plane"></i> Assign Task</button>
+          </form>
+        </div>
+      </div>
+
+      <div id="reports-page" class="modal-page">
+        <div class="card">
+          <div class="card-header"><div><h2><i class="fas fa-chart-column"></i> Reports & Export</h2><p style="color:var(--text-muted);font-size:12px;margin-top:3px">Export daily, weekly, monthly or all task data as PDF/CSV.</p></div></div>
+          <div class="report-export-card">
+            <div class="report-hero">
+              <div class="report-hero-icon"><i class="fas fa-chart-pie"></i></div>
+              <div><h3>Smart Task Export</h3><p>Download the same task data in a clean, dashboard-style report.</p></div>
+            </div>
+            <div class="report-filters">
+              <div class="owner-report-filter"><label>Employee</label><select id="reportEmployee"></select></div>
+              <div><label>Period</label><select id="reportPeriod"><option value="daily">Today</option><option value="weekly">This Week</option><option value="monthly">This Month</option><option value="all" selected>All Time</option></select></div>
+              <button class="report-btn pdf" onclick="downloadTaskReport('pdf')"><i class="fas fa-file-pdf"></i> PDF Report</button>
+              <button class="report-btn excel" onclick="downloadTaskReport('xlsx')"><i class="fas fa-file-excel"></i> Styled Excel</button>
+              <button class="report-btn csv" onclick="downloadTaskReport('csv')"><i class="fas fa-file-csv"></i> CSV</button>
+            </div>
+            <div class="report-note"><i class="fas fa-circle-info"></i> PDF and Excel keep the TASK COMMAND visual style. CSV is a plain-data format, so colors/cards are not supported by the CSV standard.</div>
+            <div class="report-summary" id="reportSummary"><span class="summary-pill">Select a period and export.</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div id="team-page" class="modal-page">
+        <div class="card"><div class="card-header"><div><h2><i class="fas fa-users"></i> Team Members</h2><p style="color:var(--text-muted);font-size:12px;margin-top:3px">Choose a teammate when assigning a task.</p></div></div><div class="team-list-grid" id="teamList"></div></div>
+      </div>
+
+      <div id="add-member-page" class="modal-page">
+        <div class="card" style="max-width:600px">
+          <div class="card-header"><h2 id="memberFormTitle"><i class="fas fa-user-plus"></i> Add New Team Member</h2></div>
+          <form onsubmit="saveMember(event)">
+            <input type="hidden" id="editMemberIndex" value="-1">
+            <div class="form-group"><label>Member Name</label><input type="text" id="memberName" required></div>
+            <div class="form-group"><label>Member Role</label><input type="text" id="memberRole" required></div>
+            <div class="form-group"><label>Email Address</label><input type="email" id="memberEmail" required></div>
+            <div class="form-group"><label>Phone Number</label><input type="tel" id="memberPhone" required></div>
+          <div class="form-group"><label>Department</label><select id="memberDepartment" required><option value="">-- Select Department --</option><option value="Amazon">Amazon</option><option value="Flipkart">Flipkart</option><option value="Other">Other</option></select></div>
+            <button type="submit" class="btn-primary" id="saveMemberBtn">Save Member</button>
+          </form>
+        </div>
+        <div class="card"><h3>Team Members & Performance Track</h3><table style="margin-top:15px"><thead><tr><th>Name</th><th>Role</th><th>Email</th><th>Phone</th><th>Completed Tasks</th><th>Actions</th></tr></thead><tbody id="memberTableBody"></tbody></table></div>
       </div>
     </div>
   </div>
+</div>
 
-  <!-- MAIN APP -->
-  <div id="appDashboard">
-
-    <!-- Mobile Overlay -->
-    <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
-
-    <!-- SIDEBAR MENU (IMAGE STYLE) -->
-    <aside class="sidebar" id="sidebar">
-      <div class="brand">
-        <i class="fas fa-bars"></i> TASK COMMAND
+<div class="task-modal" id="taskDetailsModal" onclick="if(event.target===this)closeTaskDetails()">
+  <div class="task-modal-card">
+    <div class="task-modal-cover"><div class="mini" id="detailTaskId">TASK</div><h2 id="detailTaskTitle">Task Details</h2></div>
+    <div class="task-modal-body">
+      <div class="task-detail-grid">
+        <div class="task-detail"><div class="label">Assigned To</div><div class="value" id="detailAssignedTo">—</div></div>
+        <div class="task-detail"><div class="label">Assigned By</div><div class="value" id="detailAssignedBy">—</div></div>
+        <div class="task-detail"><div class="label">Follow-up</div><div class="value" id="detailFollowUp">—</div></div>
+        <div class="task-detail"><div class="label">Department</div><div class="value" id="detailDepartment">—</div></div>
+        <div class="task-detail"><div class="label">Priority</div><div class="value" id="detailPriority">—</div></div>
+        <div class="task-detail"><div class="label">Deadline</div><div class="value" id="detailDeadline">—</div></div>
+        <div class="task-detail"><div class="label">Status</div><div class="value" id="detailStatus">—</div></div>
+        <div class="task-detail"><div class="label">Created</div><div class="value" id="detailCreated">—</div></div>
+        <div class="task-detail"><div class="label">Reminder</div><div class="value" id="detailReminder">—</div></div>
+        <div class="task-detail"><div class="label">Completed</div><div class="value" id="detailCompleted">—</div></div>
       </div>
-
-      <ul class="nav-menu">
-        <li class="nav-item active" onclick="switchTaskFilter('all','Dashboard',this)"><i class="fas fa-home"></i> Dashboard</li>
-        <li class="nav-item" onclick="switchTaskFilter('my','My Tasks',this)"><i class="fas fa-list-check"></i> My Tasks</li>
-        <li class="nav-item admin-only" onclick="switchTaskFilter('all','All Tasks',this)"><i class="fas fa-layer-group"></i> All Tasks</li>
-        <li class="nav-item" onclick="switchTaskFilter('in-progress','In Progress',this)"><i class="fas fa-clock"></i> In Progress</li>
-        <li class="nav-item" onclick="switchTaskFilter('completed','Completed',this)"><i class="fas fa-circle-check"></i> Completed</li>
-        <li class="nav-item admin-only" onclick="switchPage('assign-task-page','Assign Task',this)"><i class="fas fa-plus-circle"></i> Assign Task</li>
-        <li class="nav-item admin-only" onclick="switchPage('add-member-page','Manage Members',this)"><i class="fas fa-users"></i> Manage Members</li>
-        <li class="nav-item owner-only" onclick="switchPage('team-page','Team Members',this)"><i class="fas fa-people-group"></i> Team Members</li>
-        <li class="nav-item" onclick="switchPage('announcements-page','Announcements',this)"><i class="fas fa-bullhorn"></i> Announcements</li>
-        <li class="nav-item" onclick="switchPage('reports-page','Reports',this)"><i class="fas fa-chart-column"></i> Reports</li>
-      </ul>
-
-      <!-- Quick Add Task -->
-      <div class="quick-add admin-only">
-        <h4>Quick Add Task</h4>
-        <input type="text" id="quickTitle" placeholder="Task Title">
-        <select id="quickAssignee"></select>
-        <select id="quickPriority">
-          <option value="High">High Priority</option>
-          <option value="Medium" selected>Medium Priority</option>
-          <option value="Low">Low Priority</option>
-        </select>
-        <input type="date" id="quickDueDate">
-        <button class="btn-primary" style="padding: 10px;" onclick="createQuickTask()">+ Add Task</button>
-      </div>
-
-      <!-- User Profile -->
-      <div class="user-profile" onclick="openProfileModal()" title="Open Employee Profile" style="cursor:pointer;">
-        <div class="avatar">S</div>
-        <div>
-          <p style="font-size: 0.85rem; font-weight: 700; color:#fff;" id="userProfileName" id="sidebarUserName">Shakti Employee</p>
-          <p style="font-size: 0.72rem; color: #a3aed1;">Task Administrator</p>
-        </div>
-      </div>
-    </aside>
-
-    <!-- MAIN CONTENT -->
-    <div class="main-wrapper">
-      <header>
-        <div class="header-left">
-          <button class="mobile-toggle" onclick="toggleSidebar()"><i class="fas fa-bars"></i></button>
-          <h3 id="currentPageTitle">Dashboard</h3>
-        </div>
-
-        <!-- RIGHT SIDE: Notification & Profile -->
-        <div class="header-right">
-
-          <!-- Notification Bell -->
-          <div class="notif-wrapper" onclick="toggleNotificationDropdown()">
-            <i class="fas fa-bell notif-bell"></i>
-            <span class="notif-badge" id="notifCount">0</span>
-            <div class="notif-dropdown" id="notifDropdown">
-              <h4
-                style="margin-bottom:8px; font-size:0.85rem; border-bottom:1px solid var(--border); padding-bottom:5px;">
-                Notifications</h4>
-              <div id="notifList" style="max-height:200px; overflow-y:auto;">
-                <p style="font-size:0.75rem; color:var(--text-muted); text-align:center;">No new notifications</p>
-              </div>
-            </div>
-          </div>
-
-          <!-- User Profile & Photo Upload -->
-          <div class="header-profile">
-            <div class="profile-avatar-container" onclick="openProfileModal()"
-              title="Open employee profile">
-              <div id="headerAvatar" class="header-avatar">S</div>
-              <div class="photo-upload-overlay" onclick="event.stopPropagation(); openProfilePhotoPicker()"><i class="fas fa-camera"></i></div>
-            </div>
-            <!-- Hidden File Input for Profile Photo -->
-            <input type="file" id="profilePhotoInput" accept="image/*" style="display:none;" onchange="uploadProfilePhoto(event)">
-
-            <div>
-              <p style="font-size: 0.85rem; font-weight: 700; color:var(--text-main);" id="headerUserName">Shakti
-                Employee</p>
-              <p style="font-size: 0.7rem; color: var(--text-muted);" id="headerUserRole">Active User</p>
-            </div>
-          </div>
-
-          <button style="background:var(--danger); color:white; border:none; padding:7px 16px; border-radius:8px; cursor:pointer; font-weight:600;" onclick="logout()">Logout</button>
-        </div>
-      </header>
-
-      <div class="content-area">
-
-        <!-- DASHBOARD / TASKS LIST PAGE -->
-        <div id="dashboard-page" class="modal-page active">
-
-          <div class="stats-grid">
-            <div class="stat-card" onclick="switchTaskFilter('pending','Pending Tasks')"><i class="fas fa-hourglass-half"></i><strong id="statPending">0</strong><span>Pending</span></div>
-            <div class="stat-card" onclick="switchTaskFilter('in-progress','In Progress')"><i class="fas fa-spinner"></i><strong id="statProgress">0</strong><span>In Progress</span></div>
-            <div class="stat-card" onclick="switchTaskFilter('completed','Completed Tasks')"><i class="fas fa-circle-check"></i><strong id="statCompleted">0</strong><span>Completed</span></div>
-            <div class="stat-card" onclick="switchTaskFilter('all','Total Tasks')"><i class="fas fa-list"></i><strong id="statTotal">0</strong><span>Total Tasks</span></div>
-          </div>
-          <div class="card">
-            <div class="card-header">
-              <h3 id="taskTableHeading">Live Task List</h3>
-            </div>
-            <table>
-              <thead>
-                <tr>
-                  <th>Task ID</th>
-                  <th>Task Type</th>
-                  <th>Assigned To</th>
-                  <th>Priority</th>
-                  <th>Deadline</th>
-                  <th>Status Track</th>
-                  <th>Completion Time</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody id="dashboardTaskTable">
-                <!-- Dynamically Populated -->
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <!-- ASSIGN TASK PAGE -->
-        <div id="assign-task-page" class="modal-page">
-          <div class="card">
-            <div class="card-header">
-              <h2 id="taskFormTitle"><i class="fas fa-tasks"></i> Assign New Task</h2>
-            </div>
-            <form onsubmit="submitFullTask(event)">
-              <input type="hidden" id="editTaskId">
-
-              <div class="grid-2">
-                <div class="form-group">
-
-                  <label>Select Task Type / Department</label>
-                  <select id="fullTaskType" required>
-                    <option value="" disabled selected>-- Choose Task Type --</option>
-                    <optgroup label="Operations Modules">
-                      <option value="CATALOGUE">CATALOGUE</option>
-                      <option value="SALES">SALES</option>
-                      <option value="INVENTORY">INVENTORY</option>
-                      <option value="PURCHASE ORDER (PO)">PURCHASE ORDER (PO)</option>
-                      <option value="APPOINTMENTS">APPOINTMENTS</option>
-                    </optgroup>
-                    <optgroup label="Reports">
-                      <option value="DOWNLOAD SALES REPORT">DOWNLOAD SALES REPORT</option>
-                      <option value="DOWNLOAD ADVERTISEMENT REPORT">DOWNLOAD ADVERTISEMENT REPORT</option>
-                      <option value="AMAZON PI KW REPORTS DOWNLOAD">AMAZON PI KW REPORTS DOWNLOAD</option>
-                      <option value="AMAZON PI ACCOUNT ACCESS & SETTINGS">AMAZON PI ACCOUNT ACCESS & SETTINGS</option>
-                    </optgroup>
-                    <optgroup label="Orders & Account Health">
-                      <option value="CHECK ORDERS">CHECK ORDERS</option>
-                      <option value="SELLER FULFILLED RETURNS">SELLER FULFILLED RETURNS</option>
-                      <option value="CHECK ACCOUNT HEALTH">CHECK ACCOUNT HEALTH</option>
-                      <option value="CHECK PERFORMANCE NOTIFICATION">CHECK PERFORMANCE NOTIFICATION</option>
-                      <option value="CUSTOMER REVIEWS">CUSTOMER REVIEWS</option>
-                      <option value="GMAIL">GMAIL</option>
-                      <option value="TOP ASIN LISTING & PRICE">TOP ASIN LISTING & PRICE</option>
-                      <option value="BUYER MESSAGE">BUYER MESSAGE</option>
-                      <option value="ADVERTISEMENT">ADVERTISEMENT</option>
-                      <option value="CASE">CASE</option>
-                    </optgroup>
-                  </select>
-                </div>
-
-                <div class="form-group">
-                  <label>Assign To (Team Member)</label>
-                  <select id="fullAssignee" required></select><div id="multiAssigneeBox" style="margin-top:8px;"></div>
-                </div>
-              </div>
-
-              <div class="grid-3">
-                <div class="form-group">
-                  <label>Priority</label>
-                  <select id="fullPriority">
-                    <option value="High">High</option>
-                    <option value="Medium" selected>Medium</option>
-                    <option value="Low">Low</option>
-                  </select>
-                </div>
-                <div class="form-group">
-                  <label>Set Deadline Date</label>
-                  <input type="date" id="fullDeadline" required>
-                </div>
-                <div class="form-group">
-                  <label>Set Reminder Date & Time</label>
-                  <input type="datetime-local" id="fullReminder">
-                </div>
-              </div>
-
-              <div class="form-group">
-                <label>Task Description & Instructions</label>
-                <div class="editor-toolbar">
-                  <button type="button" onclick="execCmd('bold')"><i class="fas fa-bold"></i></button>
-                  <button type="button" onclick="execCmd('italic')"><i class="fas fa-italic"></i></button>
-                  <button type="button" onclick="execCmd('underline')"><i class="fas fa-underline"></i></button>
-                </div>
-                <div class="editor-content" id="fullDescription" contenteditable="true"></div>
-              </div>
-              <div class="form-group">
-                <label><i class="fas fa-paperclip"></i> Attach File / Document</label>
-                <input type="file" id="fullTaskFile" style="padding: 8px; background: #fff; border: 1px solid var(--border); border-radius: 8px; width: 100%;">
-              </div>
-
-              <button type="submit" class="btn-primary" style="margin-top:10px;" id="saveTaskBtn"><i class="fas fa-paper-plane"></i> Assign Task</button>
-            </form>
-          </div>
-        </div>
-
-        <!-- ADD / EDIT MEMBER PAGE -->
-        <div id="add-member-page" class="modal-page">
-          <div class="card" style="max-width: 600px;">
-            <div class="card-header">
-              <h2 id="memberFormTitle"><i class="fas fa-user-plus"></i> Add New Team Member</h2>
-            </div>
-            <form onsubmit="saveMember(event)">
-              <input type="hidden" id="editMemberIndex" value="-1">
-              <div class="form-group">
-                <label>Member Name</label>
-                <input type="text" id="memberName" required>
-              </div>
-              <div class="form-group">
-                <label>Member Role</label>
-                <input type="text" id="memberRole" required>
-              </div>
-              <div class="form-group">
-                <label>Email Address</label>
-                <input type="email" id="memberEmail" required>
-              </div>
-              <div class="form-group">
-                <label>Phone Number</label>
-                <input type="tel" id="memberPhone" required>
-              </div>
-
-              <button type="submit" class="btn-primary" id="saveMemberBtn">Save Member</button>
-            </form>
-          </div>
-
-          <div class="card">
-            <h3>Team Members & Performance Track</h3>
-            <table style="margin-top:15px;">
-              <thead>
-                <tr>
-                  <th>Name</th>
-                  <th>Role</th>
-                  <th>Email</th>
-                  <th>Phone Number</th>
-                  <th>Completed Tasks</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody id="memberTableBody">
-                <!-- Dynamically Rendered -->
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-
-        <!-- TEAM MEMBERS -->
-        <div id="team-page" class="modal-page owner-only-page">
-          <div class="card">
-            <div class="card-header"><h2><i class="fas fa-people-group"></i> Team Members</h2></div>
-            <div class="member-grid" id="teamMemberGrid"></div>
-          </div>
-        </div>
-
-        <!-- ANNOUNCEMENTS -->
-        <div id="announcements-page" class="modal-page">
-          <div class="card admin-only">
-            <div class="card-header"><h2><i class="fas fa-bullhorn"></i> Create Announcement</h2></div>
-            <form onsubmit="createAnnouncement(event)">
-              <div class="grid-2">
-                <div class="form-group"><label>Title</label><input id="annTitle" required></div>
-                <div class="form-group"><label>Category</label>
-                  <select id="annCategory">
-                    <option>General Announcement</option><option>Company Event</option><option>Birthday</option>
-                    <option>Exhibition</option><option>Meeting</option><option>Company News</option>
-                    <option>Achievement</option><option>Important Notice</option><option>Other</option>
-                  </select>
-                </div>
-              </div>
-              <div class="form-group"><label>Rich Description</label>
-                <div class="editor-toolbar">
-                  <button type="button" onclick="announcementCmd('bold')"><i class="fas fa-bold"></i></button>
-                  <button type="button" onclick="announcementCmd('italic')"><i class="fas fa-italic"></i></button>
-                  <button type="button" onclick="announcementCmd('underline')"><i class="fas fa-underline"></i></button>
-                  <select onchange="announcementFontSize(this.value)"><option value="">Font size</option><option value="2">Small</option><option value="3">Normal</option><option value="5">Large</option><option value="7">Huge</option></select>
-                </div>
-                <div class="editor-content" id="annDescription" contenteditable="true"></div>
-              </div>
-              <div class="form-group"><label>File / Image Attachment</label><input type="file" id="annFile" accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt"></div>
-              <button class="btn-primary" type="submit"><i class="fas fa-paper-plane"></i> Publish Announcement</button>
-            </form>
-          </div>
-          <div class="announcement-grid" id="announcementList"></div>
-        </div>
-
-        <!-- REPORTS -->
-        <div id="reports-page" class="modal-page">
-          <div class="card">
-            <div class="card-header"><h2><i class="fas fa-chart-column"></i> Reports</h2></div>
-            <div class="notice-box">Choose a period, filter the data, then export the same report to Excel or print it to PDF.</div>
-            <div class="report-controls">
-              <div class="form-group"><label>Period</label><select id="reportPeriod" onchange="updateReportDates()"><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="monthly" selected>Monthly</option><option value="custom">Custom</option></select></div>
-              <div class="form-group"><label>From</label><input type="date" id="reportFrom"></div>
-              <div class="form-group"><label>To</label><input type="date" id="reportTo"></div>
-              <div class="form-group owner-only"><label>Employee</label><select id="reportEmployee"></select></div>
-              <button class="btn-primary" onclick="renderReport()"><i class="fas fa-filter"></i> Apply</button>
-              <button class="btn-primary" onclick="exportExcel()"><i class="fas fa-file-excel"></i> Excel</button>
-              <button class="btn-primary" onclick="exportPDF()"><i class="fas fa-file-pdf"></i> PDF</button>
-            </div>
-          </div>
-          <div class="stats-grid">
-            <div class="stat-card"><strong id="reportTotal">0</strong><span>Total</span></div>
-            <div class="stat-card"><strong id="reportPending">0</strong><span>Pending</span></div>
-            <div class="stat-card"><strong id="reportProgress">0</strong><span>In Progress</span></div>
-            <div class="stat-card"><strong id="reportCompleted">0</strong><span>Completed</span></div>
-          </div>
-          <div class="card"><div class="table-scroll"><table><thead><tr><th>ID</th><th>Task</th><th>Assigned To</th><th>Status</th><th>Priority</th><th>Deadline</th><th>Created</th></tr></thead><tbody id="reportTable"></tbody></table></div></div>
-        </div>
-
-      </div>
+      <div class="task-description" id="detailDescription">No description.</div>
+      <div class="task-modal-actions"><a id="detailFile" class="btn-sm btn-success" target="_blank" style="display:none"><i class="fas fa-paperclip"></i> Open Attachment</a><button class="btn-sm btn-edit" onclick="closeTaskDetails()">Close</button></div>
     </div>
   </div>
+</div>
 
-
-  <div class="task-details-modal" id="taskDetailsModal" onclick="if(event.target===this)closeTaskDetails()">
-    <div class="task-details-card">
-      <div class="modal-title-row"><div><small id="taskDetailCategory"></small><h2 id="taskDetailTitle">Task Details</h2></div><button class="modal-close" onclick="closeTaskDetails()">×</button></div>
-      <div class="task-detail-grid" id="taskDetailGrid"></div>
-      <div class="task-detail-block"><h4>Description</h4><div id="taskDetailDescription"></div></div>
-      <div class="task-detail-block"><h4>Team Members</h4><div id="taskDetailTeam"></div></div>
-      <div class="task-detail-block"><h4>Attached Files</h4><div id="taskDetailFiles"></div></div>
+<div class="profile-modal announcement-modal" id="announcementModal" onclick="if(event.target===this)closeAnnouncementModal()">
+  <div class="profile-card">
+    <div class="profile-cover"></div>
+    <div class="profile-main">
+      <div class="profile-top"><div><h2 style="margin-top:15px">Create Announcement</h2><div class="profile-role">Share appreciation, birthday wishes, events, tours, games or important instructions.</div></div><button class="profile-close" onclick="closeAnnouncementModal()"><i class="fas fa-times"></i></button></div>
+      <div class="form-group" style="margin-top:18px"><label>Announcement Title</label><input id="annTitle" placeholder="e.g. Great work team! 🎉"></div>
+      <div class="announcement-type-grid" id="announcementTypeGrid">
+        <button type="button" class="event-chip active" data-type="Announcement" onclick="selectAnnouncementType(this)">📢 Announcement</button>
+        <button type="button" class="event-chip" data-type="Appreciation" onclick="selectAnnouncementType(this)">🏆 Appreciation</button>
+        <button type="button" class="event-chip" data-type="Birthday" onclick="selectAnnouncementType(this)">🎂 Birthday</button>
+        <button type="button" class="event-chip" data-type="Event" onclick="selectAnnouncementType(this)">🎉 Event</button>
+        <button type="button" class="event-chip" data-type="Tour" onclick="selectAnnouncementType(this)">🚌 Tour</button>
+        <button type="button" class="event-chip" data-type="Game" onclick="selectAnnouncementType(this)">🎮 Game</button>
+        <button type="button" class="event-chip" data-type="Instruction" onclick="selectAnnouncementType(this)">📌 Instruction</button>
+      </div>
+      <div class="form-group" style="margin-top:14px"><label>Description / Instructions</label><div class="editor-toolbar"><button type="button" onclick="execAnnouncementCmd('bold')"><i class="fas fa-bold"></i></button><button type="button" onclick="execAnnouncementCmd('italic')"><i class="fas fa-italic"></i></button><button type="button" onclick="execAnnouncementCmd('underline')"><i class="fas fa-underline"></i></button></div><div class="announcement-editor" id="annDescription" contenteditable="true"></div></div>
+      <div class="form-group"><label><i class="fas fa-paperclip"></i> Add File</label><input type="file" id="annFile" style="padding:8px;background:#fff;border:1px solid var(--border);border-radius:8px;width:100%"></div>
+      <div class="profile-actions"><button class="secondary" onclick="closeAnnouncementModal()">Cancel</button><button class="primary" onclick="publishAnnouncement()" id="publishAnnouncementBtn">Publish Announcement</button></div>
     </div>
   </div>
+</div>
 
-  <!-- EMPLOYEE PROFILE MODAL -->
-  <div class="profile-modal" id="profileModal" onclick="if(event.target===this) closeProfileModal()">
-    <div class="profile-card">
-      <div class="profile-cover"></div>
-      <div class="profile-main">
-        <div class="profile-top">
-          <div>
-            <div id="profileBigAvatar" class="profile-big-avatar">S</div>
-            <h2 id="profileFullName" id="sidebarUserName">Shakti Employee</h2>
-            <div class="profile-role" id="profileRole">Task Administrator</div>
-          </div>
-          <button class="profile-close" onclick="closeProfileModal()"><i class="fas fa-xmark"></i></button>
-        </div>
+<div class="profile-modal" id="profileModal" onclick="if(event.target===this)closeProfileModal()">
+  <div class="profile-card">
+    <div class="profile-cover"></div>
+    <div class="profile-main">
+      <div class="profile-top">
+        <div><div class="profile-big-avatar" id="profileBigAvatar">S</div><h2 id="profileName">Employee</h2><div class="profile-role" id="profileRole">Active User</div></div>
+        <button class="profile-close" onclick="closeProfileModal()"><i class="fas fa-times"></i></button>
+      </div>
+      <div class="profile-grid">
+        <div class="profile-info"><div class="label">Role</div><div class="value" id="profileRole2">Not added</div></div>
+        <div class="profile-info"><div class="label">Mobile Number</div><div class="value" id="profilePhone">Not added</div></div>
+        <div class="profile-info"><div class="label">Email</div><div class="value" id="profileEmail">Not added</div></div>
+        <div class="profile-info"><div class="label">Employee ID</div><div class="value" id="profileEmployeeId">Not added</div></div>
+      </div>
+      <div class="profile-actions"><button class="secondary" onclick="document.getElementById('profilePhotoInput').click()"><i class="fas fa-camera"></i> Change Photo</button><button class="primary" onclick="toggleProfileEdit()"><i class="fas fa-pen"></i> Edit Profile</button></div>
+      <div id="profileEditPanel" style="display:none;margin-top:18px;padding-top:18px;border-top:1px solid var(--border)">
         <div class="profile-grid">
-          <div class="profile-info"><div class="label">Employee ID</div><div class="value" id="profileEmployeeId">EMP-001</div></div>
-          <div class="profile-info"><div class="label">Role</div><div class="value" id="profileRole2">Task Administrator</div></div>
-          <div class="profile-info"><div class="label">Mobile Number</div><div class="value" id="profilePhone">+91 9876543210</div></div>
-          <div class="profile-info"><div class="label">Email</div><div class="value" id="profileEmail">employee@shakti.com</div></div>
-          <div class="profile-info"><div class="label">Department</div><div class="value" id="profileDepartment">Operations</div></div>
-          <div class="profile-info"><div class="label">Joining Date</div><div class="value" id="profileJoiningDate">01-Jan-2026</div></div>
+          <div class="profile-info"><div class="label">Employee Name</div><input id="editProfileName" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:9px"></div>
+          <div class="profile-info"><div class="label">Role</div><input id="editProfileRole" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:9px"></div>
+          <div class="profile-info"><div class="label">Mobile Number</div><input id="editProfilePhone" type="tel" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:9px"></div>
+          <div class="profile-info"><div class="label">Email</div><input id="editProfileEmail" type="email" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:9px"></div>
         </div>
-        <div class="profile-actions">
-          <button class="secondary" onclick="openProfilePhotoPicker()"><i class="fas fa-camera"></i> Change Photo</button>
-          <button class="primary" onclick="closeProfileModal()">Done</button>
-        </div>
+        <div class="profile-actions"><button class="secondary" onclick="closeProfileEdit()">Cancel</button><button class="primary" onclick="saveProfileChanges()">Save Changes</button></div>
       </div>
     </div>
   </div>
+</div>
 
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="https://cdn.jsdelivr.net/npm/bcryptjs@2.4.3/dist/bcrypt.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-  <script src="supabase-config.js"></script>
-  <script src="app.js"></script>
-
-
-
+<input type="file" id="profilePhotoInput2" accept="image/*" style="display:none">
+<div class="toast" id="toast"></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/bcryptjs@2.4.3/dist/bcrypt.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="supabase-config.js"></script>
+<script src="app.js"></script>
+<script src="login-fix-v8.js"></script>
 
 
 </body>
-
 </html>
