@@ -76,9 +76,9 @@ async function supabaseCall(action, payload = {}) {
     case 'login':
       rpcName = 'login_employee';
       params = {
-        p_login_id: payload.employeeId || '',
-        p_password: payload.password || '',
-        p_department: payload.department || ''
+        p_login_id: String(payload.employeeId || '').trim(),
+        p_password: String(payload.password || ''),
+        p_department: String(payload.department || '').trim()
       };
       break;
 
@@ -289,8 +289,8 @@ async function supabaseCall(action, payload = {}) {
   }
 
   // Login is kept backward-compatible with both database versions:
-  // current schema: login_employee(p_login_id, p_password, p_department)
-  // older schema: login_employee(p_login_id, p_password)
+  // current schema: login_employee(p_department, p_login_id, p_password)
+  // older schema:  login_employee(p_login_id, p_password)
   let data, error;
   if (action === 'login') {
     const first = await supabaseClient.rpc('login_employee', params);
@@ -878,13 +878,7 @@ function _rDownload(bytes,name,type){
 }
 function _rDate(){return new Date().toLocaleString(undefined,{year:'numeric',month:'short',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit'});}
 
-/* ---------- Excel exporter: reference table format ---------- */
-function _xlsxEsc(v){
-  return String(v==null?'':v)
-    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
-    .replace(/>/g,'&gt;').replace(/"/g,'&quot;')
-    .replace(/'/g,'&apos;');
-}
+/* ---------- Valid XLSX writer (no CSV, no broken XML) ---------- */
 function _u16(n){return [n&255,(n>>>8)&255];}
 function _u32(n){return [n&255,(n>>>8)&255,(n>>>16)&255,(n>>>24)&255];}
 function _bytes(s){return Array.from(new TextEncoder().encode(String(s)));}
@@ -907,99 +901,179 @@ function _zipStore(files){
   return new Uint8Array(out);
 }
 function _col(n){let s='';n--;do{s=String.fromCharCode(65+(n%26))+s;n=Math.floor(n/26)-1;}while(n>=0);return s;}
-function _xlsxCell(ref,val,style=0){
-  const s=_xlsxEsc(val);
+function _xlsxStyle(){
+  const fonts=[
+    '<font><name val="Aptos"/><sz val="11"/><color rgb="FF0F172A"/></font>',
+    '<font><name val="Aptos"/><b/><sz val="10"/><color rgb="FFFFFFFF"/></font>',
+    '<font><name val="Aptos"/><sz val="10"/><color rgb="FF0F172A"/></font>',
+    '<font><name val="Aptos Display"/><b/><sz val="25"/><color rgb="FF173B8F"/></font>',
+    '<font><name val="Aptos Display"/><b/><sz val="16"/><color rgb="FF633BFF"/></font>',
+    '<font><name val="Aptos"/><b/><sz val="9"/><color rgb="FF64748B"/></font>',
+    '<font><name val="Aptos"/><b/><sz val="21"/><color rgb="FF173B8F"/></font>',
+    '<font><name val="Aptos"/><b/><sz val="21"/><color rgb="FF32905A"/></font>',
+    '<font><name val="Aptos"/><b/><sz val="21"/><color rgb="FFE58A00"/></font>',
+    '<font><name val="Aptos"/><b/><sz val="21"/><color rgb="FF6B36C9"/></font>',
+    '<font><name val="Aptos"/><b/><sz val="10"/><color rgb="FF0F172A"/></font>'
+  ];
+  const fills=['<fill><patternFill patternType="none"/></fill>','<fill><patternFill patternType="gray125"/></fill>'];
+  ['FF173B8F','FFE8F1FF','FFE8F8EF','FFFFF5DE','FFF0EBFF','FFF8FAFC','FFFFE7A6','FFD9C8FF','FFC9E8D0','FFFFC9C9'].forEach(c=>fills.push('<fill><patternFill patternType="solid"><fgColor rgb="'+c+'"/><bgColor indexed="64"/></patternFill></fill>'));
+  const border='<border><left style="thin"><color rgb="FFD5DEEE"/></left><right style="thin"><color rgb="FFD5DEEE"/></right><top style="thin"><color rgb="FFD5DEEE"/></top><bottom style="thin"><color rgb="FFD5DEEE"/></bottom><diagonal/></border>';
+  const borders='<border><left/><right/><top/><bottom/><diagonal/></border>'+border;
+  const xfs=[];
+  const xf=(font,fill,borderId=1,align='left',wrap=true)=>'<xf numFmtId="0" fontId="'+font+'" fillId="'+fill+'" borderId="'+borderId+'" applyFont="1" applyFill="1" applyBorder="1"><alignment horizontal="'+align+'" vertical="center"'+(wrap?' wrapText="1"':'')+'/></xf>';
+  xfs.push(xf(0,2,0,'left',false)); //0 white base
+  xfs.push(xf(1,2,1,'center',false)); //1 navy header
+  xfs.push(xf(2,7,1,'left',true)); //2 alternating white-ish
+  xfs.push(xf(3,0,0,'center',false)); //3 title
+  xfs.push(xf(4,0,0,'center',false)); //4 subtitle
+  xfs.push(xf(5,0,0,'center',false)); //5 meta
+  xfs.push(xf(6,3,1,'center',false)); //6 total KPI
+  xfs.push(xf(7,4,1,'center',false)); //7 complete KPI
+  xfs.push(xf(8,5,1,'center',false)); //8 pending KPI
+  xfs.push(xf(9,6,1,'center',false)); //9 progress KPI
+  xfs.push(xf(10,7,1,'left',true)); //10 alternate
+  xfs.push(xf(10,8,1,'left',true)); //11 medium priority
+  xfs.push(xf(10,9,1,'left',true)); //12 in progress
+  xfs.push(xf(10,10,1,'left',true)); //13 completed
+  xfs.push(xf(10,11,1,'left',true)); //14 pending
+  return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
+    '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'+
+    '<numFmts count="0"/><fonts count="'+fonts.length+'">'+fonts.join('')+'</fonts>'+ 
+    '<fills count="'+fills.length+'">'+fills.join('')+'</fills>'+ 
+    '<borders count="2">'+borders+'</borders>'+ 
+    '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>'+ 
+    '<cellXfs count="'+xfs.length+'">'+xfs.join('')+'</cellXfs>'+ 
+    '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>'+ 
+    '<tableStyles count="0" defaultTableStyle="TableStyleMedium2" defaultPivotStyle="PivotStyleLight16"/>'+
+    '</styleSheet>';
+}
+function _xlsxCell(ref,val,style){
+  const s=String(val==null?'':val);
   if(typeof val==='number' && isFinite(val))return '<c r="'+ref+'" s="'+style+'" t="n"><v>'+val+'</v></c>';
+  return '<c r="'+ref+'" s="'+style+'" t="inlineStr"><is><t xml:space="preserve">'+_rEsc(s)+'</t></is></c>';
+}
+/* ---------- Excel 2007+ writer — OpenXML template based ---------- */
+const _XLSX_STATIC = {
+  core: "<cp:coreProperties xmlns:cp=\"http://schemas.openxmlformats.org/package/2006/metadata/core-properties\"><dc:creator xmlns:dc=\"http://purl.org/dc/elements/1.1/\">openpyxl</dc:creator><dcterms:created xmlns:dcterms=\"http://purl.org/dc/terms/\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:type=\"dcterms:W3CDTF\">2026-08-13T10:31:12Z</dcterms:created><dcterms:modified xmlns:dcterms=\"http://purl.org/dc/terms/\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:type=\"dcterms:W3CDTF\">2026-08-13T10:31:12Z</dcterms:modified></cp:coreProperties>",
+  contentTypes: "<Types xmlns=\"http://schemas.openxmlformats.org/package/2006/content-types\"><Default Extension=\"rels\" ContentType=\"application/vnd.openxmlformats-package.relationships+xml\"/><Default Extension=\"xml\" ContentType=\"application/xml\"/><Override PartName=\"/xl/styles.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml\"/><Override PartName=\"/xl/theme/theme1.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.theme+xml\"/><Override PartName=\"/docProps/core.xml\" ContentType=\"application/vnd.openxmlformats-package.core-properties+xml\"/><Override PartName=\"/docProps/app.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.extended-properties+xml\"/><Override PartName=\"/xl/worksheets/sheet1.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml\"/><Override PartName=\"/xl/workbook.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml\"/></Types>",
+  rootRels: "<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\"><Relationship Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument\" Target=\"xl/workbook.xml\" Id=\"rId1\"/><Relationship Type=\"http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties\" Target=\"docProps/core.xml\" Id=\"rId2\"/><Relationship Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties\" Target=\"docProps/app.xml\" Id=\"rId3\"/></Relationships>",
+  workbook: "<workbook xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"><workbookPr/><workbookProtection/><bookViews><workbookView visibility=\"visible\" minimized=\"0\" showHorizontalScroll=\"1\" showVerticalScroll=\"1\" showSheetTabs=\"1\" tabRatio=\"600\" firstSheet=\"0\" activeTab=\"0\" autoFilterDateGrouping=\"1\"/></bookViews><sheets><sheet xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\" name=\"Task Report\" sheetId=\"1\" state=\"visible\" r:id=\"rId1\"/></sheets><definedNames><definedName name=\"_xlnm._FilterDatabase\" localSheetId=\"0\" hidden=\"1\">'Task Report'!$A$7:$H$13</definedName></definedNames><calcPr calcId=\"124519\" fullCalcOnLoad=\"1\"/></workbook>",
+  workbookRels: "<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\"><Relationship Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet\" Target=\"/xl/worksheets/sheet1.xml\" Id=\"rId1\"/><Relationship Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles\" Target=\"styles.xml\" Id=\"rId2\"/><Relationship Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme\" Target=\"theme/theme1.xml\" Id=\"rId3\"/></Relationships>",
+  styles: "<styleSheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"><numFmts count=\"0\"/><fonts count=\"11\"><font><name val=\"Calibri\"/><family val=\"2\"/><color theme=\"1\"/><sz val=\"11\"/><scheme val=\"minor\"/></font><font><name val=\"Aptos Display\"/><b val=\"1\"/><color rgb=\"00173B8F\"/><sz val=\"25\"/></font><font><name val=\"Aptos Display\"/><b val=\"1\"/><color rgb=\"00633BFF\"/><sz val=\"16\"/></font><font><name val=\"Aptos\"/><b val=\"1\"/><color rgb=\"0064748B\"/><sz val=\"9\"/></font><font><name val=\"Aptos\"/><b val=\"1\"/><color rgb=\"00FFFFFF\"/><sz val=\"11\"/></font><font><name val=\"Aptos\"/><b val=\"1\"/><color rgb=\"00173B8F\"/><sz val=\"21\"/></font><font><name val=\"Aptos\"/><b val=\"1\"/><color rgb=\"0032905A\"/><sz val=\"21\"/></font><font><name val=\"Aptos\"/><b val=\"1\"/><color rgb=\"00E58A00\"/><sz val=\"21\"/></font><font><name val=\"Aptos\"/><b val=\"1\"/><color rgb=\"006B36C9\"/><sz val=\"21\"/></font><font><name val=\"Aptos\"/><b val=\"1\"/><color rgb=\"00FFFFFF\"/><sz val=\"10\"/></font><font><name val=\"Aptos\"/><b val=\"1\"/><color rgb=\"000F172A\"/><sz val=\"10\"/></font></fonts><fills count=\"14\"><fill><patternFill/></fill><fill><patternFill patternType=\"gray125\"/></fill><fill><patternFill patternType=\"solid\"><fgColor rgb=\"00173B8F\"/></patternFill></fill><fill><patternFill patternType=\"solid\"><fgColor rgb=\"00E8F1FF\"/></patternFill></fill><fill><patternFill patternType=\"solid\"><fgColor rgb=\"00E8F8EF\"/></patternFill></fill><fill><patternFill patternType=\"solid\"><fgColor rgb=\"00FFF5DE\"/></patternFill></fill><fill><patternFill patternType=\"solid\"><fgColor rgb=\"00F0EBFF\"/></patternFill></fill><fill><patternFill patternType=\"solid\"><fgColor rgb=\"00FFFFFF\"/></patternFill></fill><fill><patternFill patternType=\"solid\"><fgColor rgb=\"00FFE7A6\"/></patternFill></fill><fill><patternFill patternType=\"solid\"><fgColor rgb=\"00FFD08A\"/></patternFill></fill><fill><patternFill patternType=\"solid\"><fgColor rgb=\"00F8FAFC\"/></patternFill></fill><fill><patternFill patternType=\"solid\"><fgColor rgb=\"00D9C8FF\"/></patternFill></fill><fill><patternFill patternType=\"solid\"><fgColor rgb=\"00FFC9C9\"/></patternFill></fill><fill><patternFill patternType=\"solid\"><fgColor rgb=\"00C9E8D0\"/></patternFill></fill></fills><borders count=\"2\"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style=\"thin\"><color rgb=\"00D5DEEE\"/></left><right style=\"thin\"><color rgb=\"00D5DEEE\"/></right><top style=\"thin\"><color rgb=\"00D5DEEE\"/></top><bottom style=\"thin\"><color rgb=\"00D5DEEE\"/></bottom></border></borders><cellStyleXfs count=\"1\"><xf numFmtId=\"0\" fontId=\"0\" fillId=\"0\" borderId=\"0\"/></cellStyleXfs><cellXfs count=\"17\"><xf numFmtId=\"0\" fontId=\"0\" fillId=\"0\" borderId=\"0\" pivotButton=\"0\" quotePrefix=\"0\" xfId=\"0\"/><xf numFmtId=\"0\" fontId=\"1\" fillId=\"0\" borderId=\"0\" applyAlignment=\"1\" pivotButton=\"0\" quotePrefix=\"0\" xfId=\"0\"><alignment horizontal=\"center\" vertical=\"center\"/></xf><xf numFmtId=\"0\" fontId=\"2\" fillId=\"0\" borderId=\"0\" applyAlignment=\"1\" pivotButton=\"0\" quotePrefix=\"0\" xfId=\"0\"><alignment horizontal=\"center\" vertical=\"center\"/></xf><xf numFmtId=\"0\" fontId=\"3\" fillId=\"0\" borderId=\"0\" applyAlignment=\"1\" pivotButton=\"0\" quotePrefix=\"0\" xfId=\"0\"><alignment horizontal=\"center\" vertical=\"center\"/></xf><xf numFmtId=\"0\" fontId=\"4\" fillId=\"2\" borderId=\"1\" applyAlignment=\"1\" pivotButton=\"0\" quotePrefix=\"0\" xfId=\"0\"><alignment horizontal=\"center\" vertical=\"center\"/></xf><xf numFmtId=\"0\" fontId=\"5\" fillId=\"3\" borderId=\"1\" applyAlignment=\"1\" pivotButton=\"0\" quotePrefix=\"0\" xfId=\"0\"><alignment horizontal=\"center\" vertical=\"center\"/></xf><xf numFmtId=\"0\" fontId=\"6\" fillId=\"4\" borderId=\"1\" applyAlignment=\"1\" pivotButton=\"0\" quotePrefix=\"0\" xfId=\"0\"><alignment horizontal=\"center\" vertical=\"center\"/></xf><xf numFmtId=\"0\" fontId=\"7\" fillId=\"5\" borderId=\"1\" applyAlignment=\"1\" pivotButton=\"0\" quotePrefix=\"0\" xfId=\"0\"><alignment horizontal=\"center\" vertical=\"center\"/></xf><xf numFmtId=\"0\" fontId=\"8\" fillId=\"6\" borderId=\"1\" applyAlignment=\"1\" pivotButton=\"0\" quotePrefix=\"0\" xfId=\"0\"><alignment horizontal=\"center\" vertical=\"center\"/></xf><xf numFmtId=\"0\" fontId=\"9\" fillId=\"2\" borderId=\"1\" applyAlignment=\"1\" pivotButton=\"0\" quotePrefix=\"0\" xfId=\"0\"><alignment horizontal=\"left\" vertical=\"center\" wrapText=\"1\"/></xf><xf numFmtId=\"0\" fontId=\"10\" fillId=\"7\" borderId=\"1\" applyAlignment=\"1\" pivotButton=\"0\" quotePrefix=\"0\" xfId=\"0\"><alignment horizontal=\"left\" vertical=\"center\" wrapText=\"1\"/></xf><xf numFmtId=\"0\" fontId=\"10\" fillId=\"8\" borderId=\"1\" applyAlignment=\"1\" pivotButton=\"0\" quotePrefix=\"0\" xfId=\"0\"><alignment horizontal=\"left\" vertical=\"center\" wrapText=\"1\"/></xf><xf numFmtId=\"0\" fontId=\"10\" fillId=\"9\" borderId=\"1\" applyAlignment=\"1\" pivotButton=\"0\" quotePrefix=\"0\" xfId=\"0\"><alignment horizontal=\"left\" vertical=\"center\" wrapText=\"1\"/></xf><xf numFmtId=\"0\" fontId=\"10\" fillId=\"10\" borderId=\"1\" applyAlignment=\"1\" pivotButton=\"0\" quotePrefix=\"0\" xfId=\"0\"><alignment horizontal=\"left\" vertical=\"center\" wrapText=\"1\"/></xf><xf numFmtId=\"0\" fontId=\"10\" fillId=\"11\" borderId=\"1\" applyAlignment=\"1\" pivotButton=\"0\" quotePrefix=\"0\" xfId=\"0\"><alignment horizontal=\"left\" vertical=\"center\" wrapText=\"1\"/></xf><xf numFmtId=\"0\" fontId=\"10\" fillId=\"12\" borderId=\"1\" applyAlignment=\"1\" pivotButton=\"0\" quotePrefix=\"0\" xfId=\"0\"><alignment horizontal=\"left\" vertical=\"center\" wrapText=\"1\"/></xf><xf numFmtId=\"0\" fontId=\"10\" fillId=\"13\" borderId=\"1\" applyAlignment=\"1\" pivotButton=\"0\" quotePrefix=\"0\" xfId=\"0\"><alignment horizontal=\"left\" vertical=\"center\" wrapText=\"1\"/></xf></cellXfs><cellStyles count=\"1\"><cellStyle name=\"Normal\" xfId=\"0\" builtinId=\"0\" hidden=\"0\"/></cellStyles><tableStyles count=\"0\" defaultTableStyle=\"TableStyleMedium9\" defaultPivotStyle=\"PivotStyleLight16\"/><colors><indexedColors><rgbColor rgb=\"00000000\"/><rgbColor rgb=\"00FFFFFF\"/><rgbColor rgb=\"00FF0000\"/><rgbColor rgb=\"0000FF00\"/><rgbColor rgb=\"000000FF\"/><rgbColor rgb=\"00FFFF00\"/><rgbColor rgb=\"00FF00FF\"/><rgbColor rgb=\"0000FFFF\"/><rgbColor rgb=\"00000000\"/><rgbColor rgb=\"00FFFFFF\"/><rgbColor rgb=\"00FF0000\"/><rgbColor rgb=\"0000FF00\"/><rgbColor rgb=\"000000FF\"/><rgbColor rgb=\"00FFFF00\"/><rgbColor rgb=\"00FF00FF\"/><rgbColor rgb=\"0000FFFF\"/><rgbColor rgb=\"00800000\"/><rgbColor rgb=\"00008000\"/><rgbColor rgb=\"00000080\"/><rgbColor rgb=\"00808000\"/><rgbColor rgb=\"00800080\"/><rgbColor rgb=\"00008080\"/><rgbColor rgb=\"00C0C0C0\"/><rgbColor rgb=\"00808080\"/><rgbColor rgb=\"009999FF\"/><rgbColor rgb=\"00993366\"/><rgbColor rgb=\"00FFFFCC\"/><rgbColor rgb=\"00CCFFFF\"/><rgbColor rgb=\"00660066\"/><rgbColor rgb=\"00FF8080\"/><rgbColor rgb=\"000066CC\"/><rgbColor rgb=\"00CCCCFF\"/><rgbColor rgb=\"00000080\"/><rgbColor rgb=\"00FF00FF\"/><rgbColor rgb=\"00FFFF00\"/><rgbColor rgb=\"0000FFFF\"/><rgbColor rgb=\"00800080\"/><rgbColor rgb=\"00800000\"/><rgbColor rgb=\"00008080\"/><rgbColor rgb=\"000000FF\"/><rgbColor rgb=\"0000CCFF\"/><rgbColor rgb=\"00CCFFFF\"/><rgbColor rgb=\"00CCFFCC\"/><rgbColor rgb=\"00FFFF99\"/><rgbColor rgb=\"0099CCFF\"/><rgbColor rgb=\"00FF99CC\"/><rgbColor rgb=\"00CC99FF\"/><rgbColor rgb=\"00FFCC99\"/><rgbColor rgb=\"003366FF\"/><rgbColor rgb=\"0033CCCC\"/><rgbColor rgb=\"0099CC00\"/><rgbColor rgb=\"00FFCC00\"/><rgbColor rgb=\"00FF9900\"/><rgbColor rgb=\"00FF6600\"/><rgbColor rgb=\"00666699\"/><rgbColor rgb=\"00969696\"/><rgbColor rgb=\"00003366\"/><rgbColor rgb=\"00339966\"/><rgbColor rgb=\"00003300\"/><rgbColor rgb=\"00333300\"/><rgbColor rgb=\"00993300\"/><rgbColor rgb=\"00993366\"/><rgbColor rgb=\"00333399\"/><rgbColor rgb=\"00333333\"/></indexedColors></colors></styleSheet>",
+  theme: "<?xml version=\"1.0\"?>\n<a:theme xmlns:a=\"http://schemas.openxmlformats.org/drawingml/2006/main\" name=\"Office Theme\">\n  <a:themeElements>\n    <a:clrScheme name=\"Office\">\n      <a:dk1>\n        <a:sysClr val=\"windowText\" lastClr=\"000000\"/>\n      </a:dk1>\n      <a:lt1>\n        <a:sysClr val=\"window\" lastClr=\"FFFFFF\"/>\n      </a:lt1>\n      <a:dk2>\n        <a:srgbClr val=\"1F497D\"/>\n      </a:dk2>\n      <a:lt2>\n        <a:srgbClr val=\"EEECE1\"/>\n      </a:lt2>\n      <a:accent1>\n        <a:srgbClr val=\"4F81BD\"/>\n      </a:accent1>\n      <a:accent2>\n        <a:srgbClr val=\"C0504D\"/>\n      </a:accent2>\n      <a:accent3>\n        <a:srgbClr val=\"9BBB59\"/>\n      </a:accent3>\n      <a:accent4>\n        <a:srgbClr val=\"8064A2\"/>\n      </a:accent4>\n      <a:accent5>\n        <a:srgbClr val=\"4BACC6\"/>\n      </a:accent5>\n      <a:accent6>\n        <a:srgbClr val=\"F79646\"/>\n      </a:accent6>\n      <a:hlink>\n        <a:srgbClr val=\"0000FF\"/>\n      </a:hlink>\n      <a:folHlink>\n        <a:srgbClr val=\"800080\"/>\n      </a:folHlink>\n    </a:clrScheme>\n    <a:fontScheme name=\"Office\">\n      <a:majorFont>\n        <a:latin typeface=\"Cambria\"/>\n        <a:ea typeface=\"\"/>\n        <a:cs typeface=\"\"/>\n        <a:font script=\"Jpan\" typeface=\"&#xFF2D;&#xFF33; &#xFF30;&#x30B4;&#x30B7;&#x30C3;&#x30AF;\"/>\n        <a:font script=\"Hang\" typeface=\"&#xB9D1;&#xC740; &#xACE0;&#xB515;\"/>\n        <a:font script=\"Hans\" typeface=\"&#x5B8B;&#x4F53;\"/>\n        <a:font script=\"Hant\" typeface=\"&#x65B0;&#x7D30;&#x660E;&#x9AD4;\"/>\n        <a:font script=\"Arab\" typeface=\"Times New Roman\"/>\n        <a:font script=\"Hebr\" typeface=\"Times New Roman\"/>\n        <a:font script=\"Thai\" typeface=\"Tahoma\"/>\n        <a:font script=\"Ethi\" typeface=\"Nyala\"/>\n        <a:font script=\"Beng\" typeface=\"Vrinda\"/>\n        <a:font script=\"Gujr\" typeface=\"Shruti\"/>\n        <a:font script=\"Khmr\" typeface=\"MoolBoran\"/>\n        <a:font script=\"Knda\" typeface=\"Tunga\"/>\n        <a:font script=\"Guru\" typeface=\"Raavi\"/>\n        <a:font script=\"Cans\" typeface=\"Euphemia\"/>\n        <a:font script=\"Cher\" typeface=\"Plantagenet Cherokee\"/>\n        <a:font script=\"Yiii\" typeface=\"Microsoft Yi Baiti\"/>\n        <a:font script=\"Tibt\" typeface=\"Microsoft Himalaya\"/>\n        <a:font script=\"Thaa\" typeface=\"MV Boli\"/>\n        <a:font script=\"Deva\" typeface=\"Mangal\"/>\n        <a:font script=\"Telu\" typeface=\"Gautami\"/>\n        <a:font script=\"Taml\" typeface=\"Latha\"/>\n        <a:font script=\"Syrc\" typeface=\"Estrangelo Edessa\"/>\n        <a:font script=\"Orya\" typeface=\"Kalinga\"/>\n        <a:font script=\"Mlym\" typeface=\"Kartika\"/>\n        <a:font script=\"Laoo\" typeface=\"DokChampa\"/>\n        <a:font script=\"Sinh\" typeface=\"Iskoola Pota\"/>\n        <a:font script=\"Mong\" typeface=\"Mongolian Baiti\"/>\n        <a:font script=\"Viet\" typeface=\"Times New Roman\"/>\n        <a:font script=\"Uigh\" typeface=\"Microsoft Uighur\"/>\n      </a:majorFont>\n      <a:minorFont>\n        <a:latin typeface=\"Calibri\"/>\n        <a:ea typeface=\"\"/>\n        <a:cs typeface=\"\"/>\n        <a:font script=\"Jpan\" typeface=\"&#xFF2D;&#xFF33; &#xFF30;&#x30B4;&#x30B7;&#x30C3;&#x30AF;\"/>\n        <a:font script=\"Hang\" typeface=\"&#xB9D1;&#xC740; &#xACE0;&#xB515;\"/>\n        <a:font script=\"Hans\" typeface=\"&#x5B8B;&#x4F53;\"/>\n        <a:font script=\"Hant\" typeface=\"&#x65B0;&#x7D30;&#x660E;&#x9AD4;\"/>\n        <a:font script=\"Arab\" typeface=\"Arial\"/>\n        <a:font script=\"Hebr\" typeface=\"Arial\"/>\n        <a:font script=\"Thai\" typeface=\"Tahoma\"/>\n        <a:font script=\"Ethi\" typeface=\"Nyala\"/>\n        <a:font script=\"Beng\" typeface=\"Vrinda\"/>\n        <a:font script=\"Gujr\" typeface=\"Shruti\"/>\n        <a:font script=\"Khmr\" typeface=\"DaunPenh\"/>\n        <a:font script=\"Knda\" typeface=\"Tunga\"/>\n        <a:font script=\"Guru\" typeface=\"Raavi\"/>\n        <a:font script=\"Cans\" typeface=\"Euphemia\"/>\n        <a:font script=\"Cher\" typeface=\"Plantagenet Cherokee\"/>\n        <a:font script=\"Yiii\" typeface=\"Microsoft Yi Baiti\"/>\n        <a:font script=\"Tibt\" typeface=\"Microsoft Himalaya\"/>\n        <a:font script=\"Thaa\" typeface=\"MV Boli\"/>\n        <a:font script=\"Deva\" typeface=\"Mangal\"/>\n        <a:font script=\"Telu\" typeface=\"Gautami\"/>\n        <a:font script=\"Taml\" typeface=\"Latha\"/>\n        <a:font script=\"Syrc\" typeface=\"Estrangelo Edessa\"/>\n        <a:font script=\"Orya\" typeface=\"Kalinga\"/>\n        <a:font script=\"Mlym\" typeface=\"Kartika\"/>\n        <a:font script=\"Laoo\" typeface=\"DokChampa\"/>\n        <a:font script=\"Sinh\" typeface=\"Iskoola Pota\"/>\n        <a:font script=\"Mong\" typeface=\"Mongolian Baiti\"/>\n        <a:font script=\"Viet\" typeface=\"Arial\"/>\n        <a:font script=\"Uigh\" typeface=\"Microsoft Uighur\"/>\n      </a:minorFont>\n    </a:fontScheme>\n    <a:fmtScheme name=\"Office\">\n      <a:fillStyleLst>\n        <a:solidFill>\n          <a:schemeClr val=\"phClr\"/>\n        </a:solidFill>\n        <a:gradFill rotWithShape=\"1\">\n          <a:gsLst>\n            <a:gs pos=\"0\">\n              <a:schemeClr val=\"phClr\">\n                <a:tint val=\"50000\"/>\n                <a:satMod val=\"300000\"/>\n              </a:schemeClr>\n            </a:gs>\n            <a:gs pos=\"35000\">\n              <a:schemeClr val=\"phClr\">\n                <a:tint val=\"37000\"/>\n                <a:satMod val=\"300000\"/>\n              </a:schemeClr>\n            </a:gs>\n            <a:gs pos=\"100000\">\n              <a:schemeClr val=\"phClr\">\n                <a:tint val=\"15000\"/>\n                <a:satMod val=\"350000\"/>\n              </a:schemeClr>\n            </a:gs>\n          </a:gsLst>\n          <a:lin ang=\"16200000\" scaled=\"1\"/>\n        </a:gradFill>\n        <a:gradFill rotWithShape=\"1\">\n          <a:gsLst>\n            <a:gs pos=\"0\">\n              <a:schemeClr val=\"phClr\">\n                <a:shade val=\"51000\"/>\n                <a:satMod val=\"130000\"/>\n              </a:schemeClr>\n            </a:gs>\n            <a:gs pos=\"80000\">\n              <a:schemeClr val=\"phClr\">\n                <a:shade val=\"93000\"/>\n                <a:satMod val=\"130000\"/>\n              </a:schemeClr>\n            </a:gs>\n            <a:gs pos=\"100000\">\n              <a:schemeClr val=\"phClr\">\n                <a:shade val=\"94000\"/>\n                <a:satMod val=\"135000\"/>\n              </a:schemeClr>\n            </a:gs>\n          </a:gsLst>\n          <a:lin ang=\"16200000\" scaled=\"0\"/>\n        </a:gradFill>\n      </a:fillStyleLst>\n      <a:lnStyleLst>\n        <a:ln w=\"9525\" cap=\"flat\" cmpd=\"sng\" algn=\"ctr\">\n          <a:solidFill>\n            <a:schemeClr val=\"phClr\">\n              <a:shade val=\"95000\"/>\n              <a:satMod val=\"105000\"/>\n            </a:schemeClr>\n          </a:solidFill>\n          <a:prstDash val=\"solid\"/>\n        </a:ln>\n        <a:ln w=\"25400\" cap=\"flat\" cmpd=\"sng\" algn=\"ctr\">\n          <a:solidFill>\n            <a:schemeClr val=\"phClr\"/>\n          </a:solidFill>\n          <a:prstDash val=\"solid\"/>\n        </a:ln>\n        <a:ln w=\"38100\" cap=\"flat\" cmpd=\"sng\" algn=\"ctr\">\n          <a:solidFill>\n            <a:schemeClr val=\"phClr\"/>\n          </a:solidFill>\n          <a:prstDash val=\"solid\"/>\n        </a:ln>\n      </a:lnStyleLst>\n      <a:effectStyleLst>\n        <a:effectStyle>\n          <a:effectLst>\n            <a:outerShdw blurRad=\"40000\" dist=\"20000\" dir=\"5400000\" rotWithShape=\"0\">\n              <a:srgbClr val=\"000000\">\n                <a:alpha val=\"38000\"/>\n              </a:srgbClr>\n            </a:outerShdw>\n          </a:effectLst>\n        </a:effectStyle>\n        <a:effectStyle>\n          <a:effectLst>\n            <a:outerShdw blurRad=\"40000\" dist=\"23000\" dir=\"5400000\" rotWithShape=\"0\">\n              <a:srgbClr val=\"000000\">\n                <a:alpha val=\"35000\"/>\n              </a:srgbClr>\n            </a:outerShdw>\n          </a:effectLst>\n        </a:effectStyle>\n        <a:effectStyle>\n          <a:effectLst>\n            <a:outerShdw blurRad=\"40000\" dist=\"23000\" dir=\"5400000\" rotWithShape=\"0\">\n              <a:srgbClr val=\"000000\">\n                <a:alpha val=\"35000\"/>\n              </a:srgbClr>\n            </a:outerShdw>\n          </a:effectLst>\n          <a:scene3d>\n            <a:camera prst=\"orthographicFront\">\n              <a:rot lat=\"0\" lon=\"0\" rev=\"0\"/>\n            </a:camera>\n            <a:lightRig rig=\"threePt\" dir=\"t\">\n              <a:rot lat=\"0\" lon=\"0\" rev=\"1200000\"/>\n            </a:lightRig>\n          </a:scene3d>\n          <a:sp3d>\n            <a:bevelT w=\"63500\" h=\"25400\"/>\n          </a:sp3d>\n        </a:effectStyle>\n      </a:effectStyleLst>\n      <a:bgFillStyleLst>\n        <a:solidFill>\n          <a:schemeClr val=\"phClr\"/>\n        </a:solidFill>\n        <a:gradFill rotWithShape=\"1\">\n          <a:gsLst>\n            <a:gs pos=\"0\">\n              <a:schemeClr val=\"phClr\">\n                <a:tint val=\"40000\"/>\n                <a:satMod val=\"350000\"/>\n              </a:schemeClr>\n            </a:gs>\n            <a:gs pos=\"40000\">\n              <a:schemeClr val=\"phClr\">\n                <a:tint val=\"45000\"/>\n                <a:shade val=\"99000\"/>\n                <a:satMod val=\"350000\"/>\n              </a:schemeClr>\n            </a:gs>\n            <a:gs pos=\"100000\">\n              <a:schemeClr val=\"phClr\">\n                <a:shade val=\"20000\"/>\n                <a:satMod val=\"255000\"/>\n              </a:schemeClr>\n            </a:gs>\n          </a:gsLst>\n          <a:path path=\"circle\">\n            <a:fillToRect l=\"50000\" t=\"-80000\" r=\"50000\" b=\"180000\"/>\n          </a:path>\n        </a:gradFill>\n        <a:gradFill rotWithShape=\"1\">\n          <a:gsLst>\n            <a:gs pos=\"0\">\n              <a:schemeClr val=\"phClr\">\n                <a:tint val=\"80000\"/>\n                <a:satMod val=\"300000\"/>\n              </a:schemeClr>\n            </a:gs>\n            <a:gs pos=\"100000\">\n              <a:schemeClr val=\"phClr\">\n                <a:shade val=\"30000\"/>\n                <a:satMod val=\"200000\"/>\n              </a:schemeClr>\n            </a:gs>\n          </a:gsLst>\n          <a:path path=\"circle\">\n            <a:fillToRect l=\"50000\" t=\"50000\" r=\"50000\" b=\"50000\"/>\n          </a:path>\n        </a:gradFill>\n      </a:bgFillStyleLst>\n    </a:fmtScheme>\n  </a:themeElements>\n  <a:objectDefaults/>\n  <a:extraClrSchemeLst/>\n</a:theme>\n",
+  app: "<Properties xmlns=\"http://schemas.openxmlformats.org/officeDocument/2006/extended-properties\"><Application>Microsoft Excel Compatible / Openpyxl 3.1.5</Application><AppVersion>3.1</AppVersion></Properties>"
+};
+function _xlsxEsc(v){
+  return String(v==null?'':v)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;')
+    .replace(/'/g,'&apos;');
+}
+function _xlsxCell2(ref,val,style){
+  const s=_xlsxEsc(val);
+  if(typeof val==='number' && isFinite(val)){
+    return '<c r="'+ref+'" s="'+style+'" t="n"><v>'+val+'</v></c>';
+  }
   return '<c r="'+ref+'" s="'+style+'" t="inlineStr"><is><t xml:space="preserve">'+s+'</t></is></c>';
 }
-const _XLSX_TABLE_STYLES='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
-'<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'+
-'<numFmts count="0"/>'+ 
-'<fonts count="5">'+
-'<font><name val="Calibri"/><sz val="11"/><color rgb="FF0F172A"/></font>'+
-'<font><name val="Calibri"/><b/><sz val="11"/><color rgb="FFFFFFFF"/></font>'+
-'<font><name val="Calibri"/><b/><sz val="11"/><color rgb="FF0F172A"/></font>'+
-'<font><name val="Calibri"/><b/><sz val="10"/><color rgb="FF0F172A"/></font>'+
-'<font><name val="Calibri"/><sz val="10"/><color rgb="FF0F172A"/></font>'+
-'</fonts>'+
-'<fills count="7">'+
-'<fill><patternFill patternType="none"/></fill>'+
-'<fill><patternFill patternType="gray125"/></fill>'+
-'<fill><patternFill patternType="solid"><fgColor rgb="FF173B8F"/><bgColor indexed="64"/></patternFill></fill>'+
-'<fill><patternFill patternType="solid"><fgColor rgb="FFF8FAFC"/><bgColor indexed="64"/></patternFill></fill>'+
-'<fill><patternFill patternType="solid"><fgColor rgb="FFE8F1FF"/><bgColor indexed="64"/></patternFill></fill>'+
-'<fill><patternFill patternType="solid"><fgColor rgb="FFFFE7A6"/><bgColor indexed="64"/></patternFill></fill>'+
-'<fill><patternFill patternType="solid"><fgColor rgb="FFD9C8FF"/><bgColor indexed="64"/></patternFill></fill>'+
-'</fills>'+
-'<borders count="2">'+
-'<border><left/><right/><top/><bottom/><diagonal/></border>'+
-'<border><left style="thin"><color rgb="FFD5DEEE"/></left><right style="thin"><color rgb="FFD5DEEE"/></right><top style="thin"><color rgb="FFD5DEEE"/></top><bottom style="thin"><color rgb="FFD5DEEE"/></bottom><diagonal/></border>'+
-'</borders>'+
-'<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>'+
-'<cellXfs count="7">'+
-'<xf numFmtId="0" fontId="0" fillId="0" borderId="0"/>'+
-'<xf numFmtId="0" fontId="1" fillId="2" borderId="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>'+
-'<xf numFmtId="0" fontId="2" fillId="4" borderId="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf>'+
-'<xf numFmtId="0" fontId="3" fillId="3" borderId="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf>'+
-'<xf numFmtId="0" fontId="3" fillId="5" borderId="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>'+
-'<xf numFmtId="0" fontId="3" fillId="6" borderId="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>'+
-'<xf numFmtId="0" fontId="4" fillId="3" borderId="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf>'+
-'</cellXfs>'+
-'<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>'+
-'<tableStyles count="0" defaultTableStyle="TableStyleMedium2" defaultPivotStyle="PivotStyleLight16"/>'+
-'</styleSheet>';
-const _XLSX_THEME='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><a:theme xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" name="Office Theme"><a:themeElements><a:clrScheme name="Office"><a:dk1><a:sysClr val="windowText" lastClr="000000"/></a:dk1><a:lt1><a:sysClr val="window" lastClr="FFFFFF"/></a:lt1><a:dk2><a:srgbClr val="44546A"/></a:dk2><a:lt2><a:srgbClr val="E7E6E6"/></a:lt2><a:accent1><a:srgbClr val="4472C4"/></a:accent1><a:accent2><a:srgbClr val="ED7D31"/></a:accent2><a:accent3><a:srgbClr val="A5A5A5"/></a:accent3><a:accent4><a:srgbClr val="FFC000"/></a:accent4><a:accent5><a:srgbClr val="5B9BD5"/></a:accent5><a:accent6><a:srgbClr val="70AD47"/></a:accent6><a:hlink><a:srgbClr val="0563C1"/></a:hlink><a:folHlink><a:srgbClr val="954F72"/></a:folHlink></a:clrScheme><a:fontScheme name="Office"><a:majorFont><a:latin typeface="Calibri Light"/></a:majorFont><a:minorFont><a:latin typeface="Calibri"/></a:minorFont></a:fontScheme><a:fmtScheme name="Office"><a:fillStyleLst><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:fillStyleLst><a:lnStyleLst><a:ln w="9525"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:prstDash val="solid"/></a:ln></a:lnStyleLst><a:effectStyleLst><a:effectStyle><a:effectLst/></a:effectStyle></a:effectStyleLst><a:bgFillStyleLst><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:bgFillStyleLst></a:fmtScheme></a:themeElements></a:theme>';
-const _XLSX_CT='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/><Override PartName="/xl/theme/theme1.xml" ContentType="application/vnd.openxmlformats-officedocument.theme+xml"/><Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/><Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/></Types>';
 function _makeXlsx(rows,f){
-  const headers=['Task ID','Task Type','Department','Assigned To','Assigned By','Follow-up','Priority','Deadline','Status','Created At','Completed At'];
-  const out=[];
-  const safe=(v)=>v==null?'':String(v);
-  const created=t=>safe(t.createdAt||t.created_at||'');
-  const completed=t=>safe(t.completedAt||t.completed_at||'');
-  const taskRows=(Array.isArray(f.tasks)?f.tasks:[]).map(t=>[
-    safe(t.id||t.task_id||''),safe(t.taskType||t.task_type||''),safe(t.department||t.taskDepartment||'Other'),
-    safe(_rAssigned(t)),safe(t.createdByName||t.assignedBy||t.assigned_by_name||'Owner'),
-    safe(t.followUp||t.follow_up||t.followup||''),safe(t.priority||'Medium'),safe(t.deadline||''),_rStatus(t.status),created(t),completed(t)
-  ]);
-  // Header row — intentionally matches the supplied Excel reference.
-  let xml='';
-  xml+='<row r="1" ht="24" customHeight="1">';headers.forEach((h,i)=>xml+=_xlsxCell(_col(i+1)+1,h,1));xml+='</row>';
-  taskRows.forEach((r,i)=>{
-    const n=i+2, rowFill=(i%2===0)?2:3;
-    xml+='<row r="'+n+'" ht="30" customHeight="1">';
-    r.forEach((v,j)=>{
-      let st=rowFill;
-      if(j===6)st=_rNorm(v)==='high'?4:3;
-      if(j===8){const s=_rStatus(v);st=s==='In Progress'?5:(s==='Completed'?3:4);}
-      xml+=_xlsxCell(_col(j+1)+n,v,st);
-    });
-    xml+='</row>';
+  const total=rows.length;
+  const complete=rows.filter(r=>r[7]==='Completed').length;
+  const pending=rows.filter(r=>r[7]==='Pending').length;
+  const progress=rows.filter(r=>r[7]==='In Progress').length;
+  const generated=_rDate();
+  const emp=f.employee||'ALL';
+  const period=String(f.period||'all').toUpperCase();
+
+  let sd='';
+  sd+='<row r="1" ht="34" customHeight="1">'+_xlsxCell2('A1','TASK COMMAND',1)+'</row>';
+  sd+='<row r="2" ht="26" customHeight="1">'+_xlsxCell2('A2','TASK PERFORMANCE REPORT',2)+'</row>';
+  sd+='<row r="3" ht="22" customHeight="1">'+_xlsxCell2('A3','Employee: '+emp+'   |   Period: '+period+'   |   Generated: '+generated,3)+'</row>';
+
+  sd+='<row r="4" ht="22" customHeight="1">'+
+    _xlsxCell2('A4','TOTAL TASKS',4)+
+    _xlsxCell2('C4','COMPLETED',4)+
+    _xlsxCell2('E4','PENDING',4)+
+    _xlsxCell2('G4','IN PROGRESS',4)+'</row>';
+
+  sd+='<row r="5" ht="38" customHeight="1">'+
+    _xlsxCell2('A5',total,5)+
+    _xlsxCell2('C5',complete,6)+
+    _xlsxCell2('E5',pending,7)+
+    _xlsxCell2('G5',progress,8)+'</row>';
+
+  sd+='<row r="6" ht="10" customHeight="1"></row>';
+
+  const headers=['TASK ID','TASK TYPE','DEPARTMENT','ASSIGNED TO','ASSIGNED BY','PRIORITY','DEADLINE','STATUS'];
+  let hr='';
+  headers.forEach((h,i)=>hr+=_xlsxCell2(_col(i+1)+'7',h,9));
+  sd+='<row r="7" ht="26" customHeight="1">'+hr+'</row>';
+
+  rows.forEach((r,i)=>{
+    const rowNum=8+i;
+    const baseStyle=(i%2===0)?10:13;
+    let rr='';
+    for(let j=0;j<8;j++){
+      let st=baseStyle;
+      if(j===5) st=_rNorm(r[j])==='high'?15:11;
+      if(j===7){
+        const s=_rStatus(r[j]);
+        st=s==='Completed'?16:s==='In Progress'?14:12;
+      }
+      rr+=_xlsxCell2(_col(j+1)+rowNum,r[j],st);
+    }
+    sd+='<row r="'+rowNum+'" ht="42" customHeight="1">'+rr+'</row>';
   });
-  const last=Math.max(1,taskRows.length+1);
-  const widths=[22,34,18,28,28,22,13,15,17,24,24];
-  const cols=widths.map((w,i)=>'<col min="'+(i+1)+'" max="'+(i+1)+'" width="'+w+'" customWidth="1"/>').join('');
+
+  const foot=8+rows.length;
+  sd+='<row r="'+foot+'" ht="24" customHeight="1">'+
+    _xlsxCell2('A'+foot,'TASK COMMAND   |   Centralized Team Management   |   '+total+' task(s) in this report',3)+
+    '</row>';
+
+  const lastTask=Math.max(7,7+rows.length);
+  const mergeRefs=[
+    'A1:H1','A2:H2','A3:H3',
+    'A4:B4','C4:D4','E4:F4','G4:H4',
+    'A5:B5','C5:D5','E5:F5','G5:H5',
+    'A'+foot+':H'+foot
+  ];
+
   const sheet='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
     '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'+
-    '<sheetPr><outlinePr summaryBelow="1" summaryRight="1"/><pageSetUpPr fitToPage="1"/></sheetPr>'+
-    '<dimension ref="A1:K'+last+'"/>'+
-    '<sheetViews><sheetView showGridLines="1" workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews>'+
-    '<sheetFormatPr defaultRowHeight="18"/>'+
-    '<cols>'+cols+'</cols>'+
-    '<sheetData>'+xml+'</sheetData>'+
-    '<autoFilter ref="A1:K'+last+'"/>'+
+    '<sheetPr><outlinePr summaryBelow="1" summaryRight="1"/><pageSetUpPr/></sheetPr>'+
+    '<dimension ref="A1:H'+foot+'"/>'+
+    '<sheetViews><sheetView showGridLines="0" workbookViewId="0">'+
+      '<pane ySplit="7" topLeftCell="A8" activePane="bottomLeft" state="frozen"/>'+
+      '<selection pane="bottomLeft" activeCell="A1" sqref="A1"/>'+
+    '</sheetView></sheetViews>'+
+    '<sheetFormatPr baseColWidth="8" defaultRowHeight="15"/>'+
+    '<cols>'+
+      '<col width="21" customWidth="1" min="1" max="1"/>'+
+      '<col width="34" customWidth="1" min="2" max="2"/>'+
+      '<col width="18" customWidth="1" min="3" max="3"/>'+
+      '<col width="25" customWidth="1" min="4" max="4"/>'+
+      '<col width="25" customWidth="1" min="5" max="5"/>'+
+      '<col width="13" customWidth="1" min="6" max="6"/>'+
+      '<col width="15" customWidth="1" min="7" max="7"/>'+
+      '<col width="17" customWidth="1" min="8" max="8"/>'+
+    '</cols>'+
+    '<sheetData>'+sd+'</sheetData>'+
+    '<autoFilter ref="A7:H'+lastTask+'"/>'+
+    '<mergeCells count="'+mergeRefs.length+'">'+mergeRefs.map(x=>'<mergeCell ref="'+x+'"/>').join('')+'</mergeCells>'+
     '<pageMargins left="0.25" right="0.25" top="0.5" bottom="0.5" header="0.2" footer="0.2"/>'+
     '<pageSetup orientation="landscape" paperSize="9" fitToHeight="0" fitToWidth="1"/>'+
     '</worksheet>';
-  const wb='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><bookViews><workbookView/></bookViews><sheets><sheet name="Task Report" sheetId="1" r:id="rId1"/></sheets></workbook>';
-  const rels='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml" Id="rId1"/><Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml" Id="rId2"/><Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme" Target="theme/theme1.xml" Id="rId3"/></Relationships>';
-  const root='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml" Id="rId1"/><Relationship Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml" Id="rId2"/><Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties" Target="docProps/app.xml" Id="rId3"/></Relationships>';
-  const core='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:creator>Task Command</dc:creator><dc:title>Task Performance Report</dc:title></cp:coreProperties>';
-  const app='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties"><Application>Task Command</Application></Properties>';
+
   return _zipStore([
-    {name:'[Content_Types].xml',data:_XLSX_CT},{name:'_rels/.rels',data:root},{name:'xl/workbook.xml',data:wb},
-    {name:'xl/_rels/workbook.xml.rels',data:rels},{name:'xl/worksheets/sheet1.xml',data:sheet},
-    {name:'xl/styles.xml',data:_XLSX_TABLE_STYLES},{name:'xl/theme/theme1.xml',data:_XLSX_THEME},
-    {name:'docProps/core.xml',data:core},{name:'docProps/app.xml',data:app}
+    {name:'[Content_Types].xml',data:_XLSX_STATIC.contentTypes},
+    {name:'_rels/.rels',data:_XLSX_STATIC.rootRels},
+    {name:'xl/workbook.xml',data:_XLSX_STATIC.workbook},
+    {name:'xl/_rels/workbook.xml.rels',data:_XLSX_STATIC.workbookRels},
+    {name:'xl/worksheets/sheet1.xml',data:sheet},
+    {name:'xl/styles.xml',data:_XLSX_STATIC.styles},
+    {name:'xl/theme/theme1.xml',data:_XLSX_STATIC.theme},
+    {name:'docProps/core.xml',data:_XLSX_STATIC.core},
+    {name:'docProps/app.xml',data:_XLSX_STATIC.app}
   ]);
 }
 /* ---------- Reference-matched PDF ---------- */
@@ -1093,94 +1167,144 @@ window.addEventListener('load',()=>setTimeout(_bindPremiumReportButtons,250));
 setTimeout(_bindPremiumReportButtons,800);
 setTimeout(_bindPremiumReportButtons,1800);
 })();
-/* TASK COMMAND — TEAM CHAT ADD-ON
-   Adds ONLY the Team Chat page + sidebar entry. Existing pages/functions are untouched.
-   Uses the existing Supabase Chat RPCs from the project's chat schema.
-*/
+
+
+/* =========================================================
+   TASK COMMAND - LIVE CHAT / WHATSAPP STYLE MODULE
+   ========================================================= */
 (function(){
-  'use strict';
-  const C={conversations:[],messages:[],people:[],activeId:null,active:null,poll:null,lastPoll:new Date(Date.now()-10000).toISOString(),busy:false};
-  const $=id=>document.getElementById(id);
-  const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
-  const initials2=n=>String(n||'U').trim().split(/\s+/).map(x=>x[0]).join('').slice(0,2).toUpperCase()||'U';
-  const me=()=>APP?.currentUser?.employeeId||APP?.currentUser?.id||'';
-  const token=()=>APP?.sessionToken||localStorage.getItem('taskCommandSession')||'';
-  async function rpc(name,params){
-    if(!window.supabaseClient?.rpc) throw new Error('Supabase client is not initialized.');
-    const {data,error}=await supabaseClient.rpc(name,params); if(error) throw error; return data||{};
-  }
-  function time(v){if(!v)return '';const d=new Date(v);return d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});}
-  function day(v){if(!v)return '';const d=new Date(v),n=new Date();if(d.toDateString()===n.toDateString())return 'Today';return d.toLocaleDateString([], {day:'2-digit',month:'short'});}
-  function notify(title,body){
-    try{ if(document.hidden && 'Notification' in window && Notification.permission==='granted') new Notification(title,{body}); }catch(e){}
-  }
-  function css(){
-    if($('tcChatStyle'))return;
-    const s=document.createElement('style');s.id='tcChatStyle';s.textContent=`
-      #tc-chat-page{padding:0!important;background:var(--bg-main,#f4f7fb)!important;min-height:calc(100vh - 80px);overflow:hidden}
-      .tc-chat-wrap{height:calc(100vh - 125px);min-height:650px;display:grid;grid-template-columns:310px minmax(420px,1fr) 285px;background:#fff;border:1px solid rgba(25,83,150,.14);border-radius:18px;overflow:hidden;box-shadow:0 12px 35px rgba(16,58,105,.08)}
-      .tc-chat-left{border-right:1px solid #e5edf6;background:#fbfdff;display:flex;flex-direction:column;min-width:0}.tc-chat-left-head{padding:18px 16px 12px;border-bottom:1px solid #e8eef6}.tc-chat-title{font-size:20px;font-weight:850;color:#102b50;margin:0}.tc-chat-sub{font-size:11px;color:#71839b;margin-top:3px}.tc-chat-search{margin-top:13px;display:flex;gap:8px}.tc-chat-search input{width:100%;padding:11px 12px;border:1px solid #d9e4f0;border-radius:11px;background:#fff;outline:none}.tc-chat-new{border:0;border-radius:11px;background:#146bd3;color:#fff;font-weight:800;padding:0 12px;cursor:pointer}.tc-chat-list{overflow:auto;padding:8px}.tc-conv{display:flex;gap:10px;padding:11px;border-radius:13px;cursor:pointer;align-items:center}.tc-conv:hover{background:#f0f6fd}.tc-conv.active{background:#e6f1ff}.tc-avatar{width:42px;height:42px;border-radius:13px;background:linear-gradient(135deg,#0a55b5,#398dff);color:#fff;display:grid;place-items:center;font-size:12px;font-weight:850;overflow:hidden;flex:none}.tc-avatar img{width:100%;height:100%;object-fit:cover}.tc-conv-main{min-width:0;flex:1}.tc-conv-name{font-size:13px;font-weight:800;color:#132c4e}.tc-conv-last{font-size:11px;color:#74859b;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.tc-conv-side{text-align:right;align-self:flex-start}.tc-conv-time{font-size:9px;color:#8a98a9}.tc-unread{display:inline-grid;place-items:center;min-width:19px;height:19px;border-radius:10px;background:#1670dc;color:#fff;font-size:9px;font-weight:850;margin-top:5px}
-      .tc-chat-center{display:flex;flex-direction:column;min-width:0;background:#f4f8fd}.tc-chat-head{height:76px;display:flex;align-items:center;gap:11px;padding:0 17px;background:#fff;border-bottom:1px solid #e4ebf4}.tc-chat-head-info{min-width:0;flex:1}.tc-chat-head-name{font-weight:850;font-size:15px;color:#132b4d}.tc-chat-head-status{font-size:10px;color:#66809d;margin-top:3px}.tc-chat-actions{display:flex;gap:7px}.tc-chat-icon{width:35px;height:35px;border:1px solid #dce6f1;border-radius:10px;background:#fff;color:#1d5e9f;cursor:pointer}.tc-chat-icon:hover{background:#edf5ff}.tc-messages{flex:1;overflow:auto;padding:18px 20px;background:linear-gradient(rgba(255,255,255,.74),rgba(255,255,255,.74)),radial-gradient(circle at 20% 20%,#dbeeff,transparent 35%);}.tc-date{text-align:center;font-size:9px;color:#8190a4;margin:4px 0 15px}.tc-msg-row{display:flex;margin:8px 0}.tc-msg-row.mine{justify-content:flex-end}.tc-bubble{max-width:min(72%,560px);padding:10px 12px;border-radius:15px;background:#fff;border:1px solid #e0e8f2;box-shadow:0 3px 10px rgba(20,58,98,.045);position:relative}.tc-msg-row.mine .tc-bubble{background:#1670dc;color:#fff;border-color:#1670dc;border-bottom-right-radius:5px}.tc-msg-row:not(.mine) .tc-bubble{border-bottom-left-radius:5px}.tc-msg-sender{font-size:9px;font-weight:850;color:#1467c8;margin-bottom:4px}.tc-msg-row.mine .tc-msg-sender{color:#d8eaff}.tc-msg-body{font-size:13px;line-height:1.48;white-space:pre-wrap;word-break:break-word}.tc-msg-meta{text-align:right;font-size:8px;opacity:.65;margin-top:5px}.tc-file{display:flex;gap:9px;align-items:center;margin-top:7px;padding:9px;border-radius:10px;background:rgba(255,255,255,.72);color:#164e86;text-decoration:none}.tc-msg-row.mine .tc-file{color:#0c3f79}.tc-compose{padding:11px 14px;background:#fff;border-top:1px solid #e2eaf3;display:flex;gap:7px;align-items:center}.tc-compose input{flex:1;padding:12px;border:1px solid #d7e3ef;border-radius:13px;background:#f8fbff;outline:none}.tc-send{width:43px;height:43px;border:0;border-radius:13px;background:linear-gradient(135deg,#0967d4,#3c87ff);color:#fff;font-size:16px;cursor:pointer}.tc-empty{height:100%;display:grid;place-items:center;color:#7890aa;text-align:center;padding:30px}.tc-empty b{display:block;color:#23486f;font-size:18px;margin-bottom:5px}
-      .tc-chat-right{background:#fff;border-left:1px solid #e4ebf4;overflow:auto}.tc-profile{padding:24px 18px;text-align:center;border-bottom:1px solid #e6edf5}.tc-profile-avatar{width:78px;height:78px;border-radius:22px;margin:auto;background:linear-gradient(135deg,#0a55b5,#3c8eff);color:#fff;display:grid;place-items:center;font-size:23px;font-weight:850;overflow:hidden}.tc-profile-avatar img{width:100%;height:100%;object-fit:cover}.tc-profile-name{font-weight:850;font-size:17px;margin-top:10px}.tc-profile-sub{font-size:10px;color:#73869e;margin-top:3px}.tc-info{padding:16px 18px;border-bottom:1px solid #edf1f6}.tc-label{font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:#8797ab;font-weight:850}.tc-value{font-size:12px;color:#213d61;margin-top:6px;word-break:break-word}.tc-person{display:flex;gap:8px;align-items:center;margin-top:10px;font-size:11px}.tc-person .tc-avatar{width:30px;height:30px;border-radius:9px;font-size:9px}.tc-dark .tc-chat-wrap{background:#0d1726;color:#e8f1fb}.tc-dark .tc-chat-left,.tc-dark .tc-chat-right,.tc-dark .tc-chat-head,.tc-dark .tc-compose{background:#111e30;border-color:#263b55}.tc-dark .tc-chat-center{background:#0b1523}.tc-dark .tc-chat-title,.tc-dark .tc-conv-name,.tc-dark .tc-chat-head-name,.tc-dark .tc-profile-name,.tc-dark .tc-value{color:#e8f1fb}.tc-dark .tc-chat-sub,.tc-dark .tc-conv-last,.tc-dark .tc-chat-head-status,.tc-dark .tc-profile-sub{color:#91a8c3}.tc-dark .tc-chat-search input,.tc-dark .tc-compose input,.tc-dark .tc-chat-icon{background:#0d1929;color:#e7eff9;border-color:#30445e}.tc-dark .tc-conv:hover{background:#17283d}.tc-dark .tc-conv.active{background:#19375b}.tc-dark .tc-messages{background:linear-gradient(rgba(10,20,33,.72),rgba(10,20,33,.72)),radial-gradient(circle at 20% 20%,#173b63,transparent 35%)}.tc-dark .tc-bubble{background:#17283a;color:#eaf2fb;border-color:#29425d}.tc-dark .tc-msg-row.mine .tc-bubble{background:#0b64cb;border-color:#0b64cb}.tc-dark .tc-empty b{color:#dceafa}
-      .tc-chat-modal{position:fixed;inset:0;z-index:100010;background:rgba(3,12,30,.64);backdrop-filter:blur(8px);display:none;align-items:center;justify-content:center;padding:18px}.tc-chat-modal.show{display:flex}.tc-chat-modal-card{width:min(620px,96vw);max-height:88vh;overflow:auto;background:#fff;border-radius:20px;padding:20px;box-shadow:0 30px 90px rgba(0,0,0,.35)}.tc-chat-modal-card h3{margin:0 0 5px}.tc-chat-modal-card p{font-size:11px;color:#71839a;margin:0 0 15px}.tc-person-search{width:100%;padding:11px;border:1px solid #d9e4f0;border-radius:10px;margin-bottom:10px}.tc-people{max-height:350px;overflow:auto}.tc-person-option{display:flex;align-items:center;gap:10px;padding:10px;border-radius:11px;cursor:pointer}.tc-person-option:hover{background:#f2f7fd}.tc-check{margin-left:auto}.tc-modal-actions{display:flex;gap:8px;margin-top:15px}.tc-modal-actions button{flex:1;padding:11px;border:0;border-radius:11px;font-weight:800;cursor:pointer}.tc-cancel{background:#edf2f7;color:#243d5e}.tc-primary{background:#176dd6;color:#fff}.tc-group-name{width:100%;padding:11px;border:1px solid #d9e4f0;border-radius:10px;margin:8px 0 12px}.tc-page-toolbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}.tc-page-toolbar h2{margin:0}.tc-toolbar-actions{display:flex;gap:7px}.tc-toolbar-actions button{border:1px solid #dbe5f0;background:#fff;border-radius:10px;padding:9px 11px;cursor:pointer;color:#1b5f9f}.tc-toolbar-actions .primary{background:#126bd5;color:#fff;border-color:#126bd5}.tc-chat-attach{display:none}
-      @media(max-width:1050px){.tc-chat-wrap{grid-template-columns:280px 1fr}.tc-chat-right{display:none}}@media(max-width:720px){.tc-chat-wrap{grid-template-columns:1fr;height:calc(100vh - 115px)}.tc-chat-left{display:none}.tc-chat-page{padding:0!important}.tc-bubble{max-width:84%}}
-    `;document.head.appendChild(s);
-  }
-  function page(){
-    if($('tc-chat-page'))return;
-    const host=document.querySelector('.content-area')||document.body;
-    const p=document.createElement('div');p.id='tc-chat-page';p.className='modal-page';
-    p.innerHTML=`<div class="tc-page-toolbar"><div><h2><i class="fas fa-comments" style="color:#126bd5"></i> Team Chat</h2><div style="font-size:11px;color:var(--text-muted,#71839a)">Connect and collaborate with your team</div></div><div class="tc-toolbar-actions"><button class="primary" onclick="tcOpenNewChat()"><i class="fas fa-plus"></i> New Chat</button><button onclick="tcToggleDark()" title="Chat theme">◐</button></div></div>
-    <div class="tc-chat-wrap"><aside class="tc-chat-left"><div class="tc-chat-left-head"><div class="tc-chat-title">Messages</div><div class="tc-chat-sub">Your conversations</div><div class="tc-chat-search"><input id="tcSearch" placeholder="Search conversations..." oninput="tcFilterChats(this.value)"><button class="tc-chat-new" onclick="tcOpenNewChat()">＋</button></div></div><div id="tcChatList" class="tc-chat-list"></div></aside>
-    <main class="tc-chat-center"><div id="tcChatHead" class="tc-chat-head"><div class="tc-empty"><div><b>Select a conversation</b><span>Choose a chat from the left</span></div></div></div><div id="tcMessages" class="tc-messages"><div class="tc-empty"><div><b>Team Chat</b><span>Start a conversation with a team member.</span></div></div></div><div class="tc-compose"><button class="tc-chat-icon" onclick="document.getElementById('tcChatFile').click()">📎</button><input id="tcChatFile" class="tc-chat-attach" type="file" onchange="tcSendFile(this.files[0])"><input id="tcComposeInput" placeholder="Type a message..." onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();tcSendMessage()}"><button class="tc-send" onclick="tcSendMessage()">➤</button></div></main>
-    <aside id="tcChatRight" class="tc-chat-right"><div class="tc-empty"><div><b>Chat details</b><span>Select a conversation to view details.</span></div></div></aside></div>`;
-    host.appendChild(p);
-    const modal=document.createElement('div');modal.id='tcChatModal';modal.className='tc-chat-modal';modal.onclick=e=>{if(e.target===modal)tcCloseNewChat()};document.body.appendChild(modal);
-  }
-  function sidebar(){
-    if($('tcChatNav'))return;
-    const side=$('sidebar');if(!side)return;
-    const candidates=[...side.querySelectorAll('.nav-item')];
-    const el=document.createElement('a');el.id='tcChatNav';el.href='javascript:void(0)';el.className='nav-item';el.innerHTML='<i class="fas fa-comments"></i><span>Team Chat</span><span id="tcChatBadge" style="display:none;margin-left:auto;background:#ef4444;color:#fff;border-radius:12px;padding:2px 7px;font-size:10px;font-weight:800"></span>';
-    el.onclick=function(){switchPage('tc-chat-page','Team Chat',el);tcOpenPage()};
-    const ref=candidates.find(x=>/member|team|report|notification/i.test(x.textContent||''));
-    (ref?.parentElement||side).appendChild(el);
-  }
-  function renderList(){
-    const box=$('tcChatList');if(!box)return;const q=String($('tcSearch')?.value||'').toLowerCase();
-    const list=C.conversations.filter(c=>!q||String(c.name||'').toLowerCase().includes(q)||String(c.lastMessage||'').toLowerCase().includes(q));
-    box.innerHTML=list.length?list.map(c=>`<div class="tc-conv ${C.activeId===c.id?'active':''}" onclick="tcOpenConversation('${esc(c.id)}')"><div class="tc-avatar">${c.photo?`<img src="${esc(c.photo)}">`:initials2(c.name)}</div><div class="tc-conv-main"><div class="tc-conv-name">${esc(c.name||'Chat')}</div><div class="tc-conv-last">${esc(c.lastMessage||'No messages yet')}</div></div><div class="tc-conv-side"><div class="tc-conv-time">${esc(day(c.lastAt))}</div>${Number(c.unread||0)>0?`<span class="tc-unread">${Math.min(99,Number(c.unread))}</span>`:''}</div></div>`).join(''):`<div class="tc-empty" style="height:260px"><div><b>No conversations</b><span>Use + to start a new chat.</span></div></div>`;
-    const total=C.conversations.reduce((n,c)=>n+Number(c.unread||0),0);const b=$('tcChatBadge');if(b){b.textContent=total>99?'99+':total;b.style.display=total?'inline-block':'none'}
-  }
-  async function loadConversations(){
-    if(!me())return;try{const d=await rpc('chat_list_conversations',{p_employee_id:String(me()),p_session_token:token()});if(d.ok===false)throw new Error(d.message||'Unable to load chats.');C.conversations=d.conversations||[];renderList();}catch(e){console.warn('CHAT LIST',e);if($('tcChatList'))$('tcChatList').innerHTML=`<div class="tc-empty"><div><b>Chat unavailable</b><span>${esc(e.message||e)}</span></div></div>`}}
-  async function openConversation(id){
-    C.activeId=id;C.active=C.conversations.find(x=>String(x.id)===String(id))||null;renderList();
-    if(!C.active)return;
-    renderHead();
-    try{const d=await rpc('chat_get_messages',{p_employee_id:String(me()),p_conversation_id:id,p_session_token:token()});if(d.ok===false)throw new Error(d.message||'Unable to load messages.');C.messages=d.messages||[];renderMessages();await rpc('chat_mark_read',{p_employee_id:String(me()),p_conversation_id:id,p_session_token:token()});const c=C.conversations.find(x=>x.id===id);if(c)c.unread=0;renderList();renderRight();}catch(e){toast(e.message||String(e))}
-  }
-  function renderHead(){const h=$('tcChatHead');if(!h)return;const c=C.active;if(!c){h.innerHTML='';return}h.innerHTML=`<div class="tc-avatar">${c.photo?`<img src="${esc(c.photo)}">`:initials2(c.name)}</div><div class="tc-chat-head-info"><div class="tc-chat-head-name">${esc(c.name)}</div><div class="tc-chat-head-status">${c.kind==='group'?'Group conversation':'Team member chat'}</div></div><div class="tc-chat-actions"><button class="tc-chat-icon" onclick="tcRequestNotification()">🔔</button><button class="tc-chat-icon" onclick="toast('Voice/video calling requires a WebRTC signaling service.')">☎</button><button class="tc-chat-icon" onclick="tcOpenInfo()">ⓘ</button></div>`}
-  function renderMessages(){const box=$('tcMessages');if(!box)return;const arr=C.messages||[];box.innerHTML=arr.length?`<div class="tc-date">${esc(day(arr[0]?.createdAt||new Date()))}</div>`+arr.map(m=>{const mine=String(m.senderId)===String(APP.currentUser?.id||APP.currentUser?.employeeId);return `<div class="tc-msg-row ${mine?'mine':''}"><div class="tc-bubble"><div class="tc-msg-sender">${mine?'You':esc(m.senderName||'Team Member')}</div><div class="tc-msg-body">${esc(m.body||'')}</div>${m.attachmentUrl?`<a class="tc-file" href="${esc(m.attachmentUrl)}" target="_blank" rel="noopener">📎 ${esc(m.attachmentName||'Attachment')}</a>`:''}<div class="tc-msg-meta">${time(m.createdAt)} ${mine?'✓✓':''}</div></div></div>`}).join(''):`<div class="tc-empty"><div><b>No messages yet</b><span>Send the first message.</span></div></div>`;box.scrollTop=box.scrollHeight}
-  function renderRight(){const r=$('tcChatRight');if(!r||!C.active)return;const c=C.active;const person=(APP.members||[]).find(m=>String(m.employeeId||m.id)===String(c.otherEmployeeId))||null;r.innerHTML=`<div class="tc-profile"><div class="tc-profile-avatar">${c.photo?`<img src="${esc(c.photo)}">`:initials2(c.name)}</div><div class="tc-profile-name">${esc(c.name)}</div><div class="tc-profile-sub">${c.kind==='group'?'Group Chat':'Team Member'}</div></div><div class="tc-info"><div class="tc-label">Conversation</div><div class="tc-value">${c.kind==='group'?'Group conversation':'Direct team chat'}</div></div><div class="tc-info"><div class="tc-label">Members</div><div class="tc-person"><div class="tc-avatar">${initials2(APP.currentUser?.name)}</div><span>${esc(APP.currentUser?.name||'You')}</span></div>${person?`<div class="tc-person"><div class="tc-avatar">${person.photo?`<img src="${esc(person.photo)}">`:initials2(person.name)}</div><span>${esc(person.name)}</span></div>`:''}</div>`}
-  async function newChat(){
-    const d=await rpc('chat_search_people',{p_employee_id:String(me()),p_query:''});if(d.ok===false)throw new Error(d.message||'Unable to load team members.');C.people=d.people||[];
-    const m=$('tcChatModal');m.innerHTML=`<div class="tc-chat-modal-card"><h3>Start a New Chat</h3><p>Search active team members or create a group.</p><input class="tc-person-search" id="tcPeopleSearch" placeholder="Search people..." oninput="tcRenderPeople(this.value)"><div id="tcPeople" class="tc-people"></div><div class="tc-modal-actions"><button class="tc-cancel" onclick="tcCloseNewChat()">Cancel</button><button class="tc-primary" onclick="tcCreateSelectedChat()">Start Chat</button>${isOwner()&&APP.members?.length?'<button class="tc-primary" onclick="tcOpenGroupCreator()">Create Group</button>':''}</div></div>`;m.classList.add('show');tcRenderPeople('');
-  }
-  function renderPeople(q){const b=$('tcPeople');if(!b)return;const x=String(q||'').toLowerCase();const p=C.people.filter(v=>String(v.name||'').toLowerCase().includes(x)||String(v.department||'').toLowerCase().includes(x));b.innerHTML=p.map(v=>`<label class="tc-person-option"><div class="tc-avatar">${v.photo?`<img src="${esc(v.photo)}">`:initials2(v.name)}</div><div><b>${esc(v.name)}</b><div style="font-size:10px;color:#8190a4">${esc(v.department||'Team Member')}</div></div><input class="tc-check" type="radio" name="tcPerson" value="${esc(v.id)}"></label>`).join('')||'<div style="padding:15px;text-align:center;color:#7a8ba0;font-size:12px">No people found.</div>'}
-  async function createSelected(){const v=document.querySelector('input[name="tcPerson"]:checked');if(!v){toast('Select a team member.');return}try{const d=await rpc('chat_open_direct',{p_employee_id:String(me()),p_other_employee_id:String(v.value),p_session_token:token()});if(d.ok===false)throw new Error(d.message||'Unable to open chat.');tcCloseNewChat();await loadConversations();await openConversation(d.conversationId)}catch(e){toast(e.message||String(e))}}
-  function groupCreator(){const m=$('tcChatModal');m.innerHTML=`<div class="tc-chat-modal-card"><h3>Create Team Group</h3><p>Owner-only group creation. Select team members.</p><input id="tcGroupName" class="tc-group-name" placeholder="Group name"><div id="tcGroupPeople" class="tc-people"></div><div class="tc-modal-actions"><button class="tc-cancel" onclick="tcOpenNewChat()">Back</button><button class="tc-primary" onclick="tcCreateGroup()">Create Group</button></div></div>`;const b=$('tcGroupPeople');b.innerHTML=(APP.members||[]).filter(x=>String(x.employeeId||x.id)!==String(APP.currentUser?.employeeId||APP.currentUser?.id)).map(v=>`<label class="tc-person-option"><div class="tc-avatar">${v.photo?`<img src="${esc(v.photo)}">`:initials2(v.name)}</div><div><b>${esc(v.name)}</b><div style="font-size:10px;color:#8190a4">${esc(v.department||'Team Member')}</div></div><input class="tc-check" type="checkbox" value="${esc(v.employeeId||v.id)}"></label>`).join('')||'<div style="padding:15px;text-align:center;color:#7a8ba0;font-size:12px">No other team members.</div>'}
-  async function createGroup(){const name=$('tcGroupName')?.value.trim();const ids=[...document.querySelectorAll('#tcGroupPeople input:checked')].map(x=>x.value);if(!name){toast('Enter a group name.');return}try{const d=await rpc('chat_create_group',{p_employee_id:String(me()),p_name:name,p_member_ids:ids,p_session_token:token()});if(d.ok===false)throw new Error(d.message||'Unable to create group.');tcCloseNewChat();await loadConversations();await openConversation(d.conversationId)}catch(e){toast(e.message||String(e))}}
-  async function send(){if(!C.activeId||C.busy)return;const input=$('tcComposeInput');const body=input?.value.trim();if(!body)return;C.busy=true;try{const d=await rpc('chat_send_message',{p_employee_id:String(me()),p_conversation_id:C.activeId,p_body:body,p_message_type:'text',p_attachment_url:null,p_attachment_name:null,p_reply_to:null,p_session_token:token()});if(d.ok===false)throw new Error(d.message||'Message could not be sent.');input.value='';C.messages.push(d.message);renderMessages();await loadConversations()}catch(e){toast(e.message||String(e))}finally{C.busy=false}}
-  async function sendFile(file){if(!file||!C.activeId)return;try{if(file.size>8*1024*1024)throw new Error('File must be 8 MB or smaller.');const path=`${me()}/${Date.now()}-${String(file.name).replace(/[^a-zA-Z0-9._-]/g,'_')}`;const up=await supabaseClient.storage.from('chat-attachments').upload(path,file,{upsert:false,contentType:file.type||undefined});if(up.error)throw up.error;const pub=supabaseClient.storage.from('chat-attachments').getPublicUrl(path);const d=await rpc('chat_send_message',{p_employee_id:String(me()),p_conversation_id:C.activeId,p_body:'',p_message_type:file.type?.startsWith('image/')?'image':'file',p_attachment_url:pub.data.publicUrl,p_attachment_name:file.name,p_reply_to:null,p_session_token:token()});if(d.ok===false)throw new Error(d.message||'Attachment failed.');C.messages.push(d.message);renderMessages();await loadConversations()}catch(e){toast(e.message||String(e))}finally{$('tcChatFile').value=''}}
-  async function poll(){if(!me()||!C.activeId)return;try{const d=await rpc('chat_poll',{p_employee_id:String(me()),p_since:C.lastPoll,p_session_token:token()});C.lastPoll=new Date().toISOString();if(d.ok&&Array.isArray(d.messages)&&d.messages.length){const incoming=d.messages.filter(m=>String(m.conversationId)===String(C.activeId));const other=d.messages.filter(m=>String(m.conversationId)!==String(C.activeId));if(incoming.length){const ids=new Set(C.messages.map(m=>String(m.id)));incoming.forEach(m=>{if(!ids.has(String(m.id)))C.messages.push(m)});renderMessages();notify(incoming[incoming.length-1].senderName||'New message',incoming[incoming.length-1].body||'Attachment received')}if(other.length){other.forEach(m=>{const c=C.conversations.find(x=>String(x.id)===String(m.conversationId));if(c)c.unread=Number(c.unread||0)+1});renderList();}}}catch(e){console.warn('CHAT POLL',e)}}
-  function openPage(){css();page();sidebar();loadConversations();if(C.poll)clearInterval(C.poll);C.poll=setInterval(()=>{if($('tc-chat-page')?.classList.contains('active'))poll()},3000);if('Notification' in window&&Notification.permission==='default')Notification.requestPermission().catch(()=>{});}
-  function toggleDark(){const p=$('tc-chat-page');if(p)p.classList.toggle('tc-dark')}
-  function closeModal(){$('tcChatModal')?.classList.remove('show')}
-  function info(){renderRight()}
-  function filterChats(v){renderList()}
-  function requestNotification(){if('Notification' in window)Notification.requestPermission().catch(()=>{});toast('Browser notification permission requested.');}
-  window.tcOpenPage=openPage;window.tcOpenConversation=openConversation;window.tcOpenNewChat=newChat;window.tcCloseNewChat=closeModal;window.tcRenderPeople=renderPeople;window.tcCreateSelectedChat=createSelected;window.tcOpenGroupCreator=groupCreator;window.tcCreateGroup=createGroup;window.tcSendMessage=send;window.tcSendFile=sendFile;window.tcFilterChats=filterChats;window.tcToggleDark=toggleDark;window.tcOpenInfo=info;window.tcRequestNotification=requestNotification;
-  function boot(){css();page();sidebar();}
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
+'use strict';
+
+const CHAT={conversations:[],activeId:null,messages:[],lastPoll:null,pollTimer:null,searchTimer:null,channel:null,unread:0};
+window.TC_CHAT=CHAT;
+
+function cEsc(v){return escapeHtml(v==null?'':String(v));}
+function chatCall(name,args){return supabaseClient.rpc(name,args).then(r=>{if(r.error)throw sbError(r.error);return r.data||{};});}
+function chatMeId(){return APP.currentUser?.id||APP.currentUser?.employee_id||'';}
+function chatLogin(){return APP.currentUser?.employeeId||APP.currentUser?.login_id||APP.currentUser?.name||'';}
+function chatTime(v){if(!v)return '';const d=new Date(v);return d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});}
+function chatDate(v){if(!v)return '';const d=new Date(v);return d.toLocaleDateString([], {day:'2-digit',month:'short'});}
+function chatAvatar(name,photo){return photo?`<img src="${cEsc(photo)}" alt="">`:cEsc(initials(name));}
+
+function injectChatUI(){
+  if(document.getElementById('tcChatPage'))return;
+  const css=document.createElement('style');css.id='tcChatCss';css.textContent=`
+  #tcChatPage{position:absolute;inset:0;display:none;background:#f4f7fc;z-index:20;padding:18px;box-sizing:border-box}
+  #tcChatPage.tc-chat-active{display:block}
+  .tc-chat-shell{height:calc(100vh - 36px);min-height:560px;display:grid;grid-template-columns:330px 1fr;background:#fff;border:1px solid #dbe5f5;border-radius:22px;overflow:hidden;box-shadow:0 20px 55px rgba(20,45,100,.12)}
+  .tc-chat-sidebar{background:linear-gradient(180deg,#071d55,#0b2b72);color:#fff;display:flex;flex-direction:column;min-width:0}
+  .tc-chat-brand{padding:20px 18px 12px;font-weight:900;font-size:19px;display:flex;align-items:center;gap:10px}.tc-chat-brand i{background:linear-gradient(135deg,#2196ff,#5140ff);width:38px;height:38px;border-radius:12px;display:grid;place-items:center}
+  .tc-chat-search{padding:8px 14px 14px}.tc-chat-search input{width:100%;box-sizing:border-box;background:rgba(255,255,255,.11);border:1px solid rgba(255,255,255,.18);color:#fff;border-radius:12px;padding:11px 12px;outline:none}.tc-chat-search input::placeholder{color:#b9c7e8}
+  .tc-chat-list{overflow:auto;flex:1;padding:4px 8px}.tc-chat-item{display:flex;gap:10px;padding:11px 10px;border-radius:14px;cursor:pointer;align-items:center}.tc-chat-item:hover,.tc-chat-item.active{background:rgba(255,255,255,.12)}
+  .tc-chat-avatar{width:43px;height:43px;border-radius:50%;background:#2f6eff;display:grid;place-items:center;overflow:hidden;flex:0 0 43px;font-weight:900}.tc-chat-avatar img{width:100%;height:100%;object-fit:cover}.tc-chat-meta{min-width:0;flex:1}.tc-chat-meta-top{display:flex;justify-content:space-between;gap:8px}.tc-chat-name{font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.tc-chat-time{font-size:10px;color:#b8c6e6;white-space:nowrap}.tc-chat-preview{font-size:12px;color:#c1cce5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:3px}.tc-chat-badge{background:#35d17d;color:#082b1a;border-radius:999px;min-width:20px;height:20px;padding:0 6px;display:grid;place-items:center;font-size:10px;font-weight:900}
+  .tc-chat-main{display:flex;flex-direction:column;min-width:0;background:#f8faff}.tc-chat-head{height:74px;background:#fff;border-bottom:1px solid #e3eaf5;display:flex;align-items:center;justify-content:space-between;padding:0 20px}.tc-chat-head-user{display:flex;align-items:center;gap:11px}.tc-chat-head h3{margin:0;color:#0b1f49;font-size:16px}.tc-chat-head small{color:#7b8aa7}.tc-chat-actions button,.tc-chat-new{border:0;background:#edf3ff;color:#173b8f;border-radius:10px;padding:9px 11px;cursor:pointer;font-weight:800}.tc-chat-actions{display:flex;gap:8px}
+  .tc-chat-messages{flex:1;overflow:auto;padding:24px 6%;background:radial-gradient(circle at 20% 20%,rgba(41,120,255,.04),transparent 28%),#f8faff}.tc-chat-empty{text-align:center;color:#8190ad;margin-top:20vh}.tc-bubble-row{display:flex;margin:8px 0}.tc-bubble-row.mine{justify-content:flex-end}.tc-bubble{max-width:min(68%,650px);padding:9px 12px;border-radius:15px;background:#fff;border:1px solid #e2e9f4;box-shadow:0 3px 12px rgba(22,52,110,.05);color:#17233d}.tc-bubble-row.mine .tc-bubble{background:linear-gradient(135deg,#dcecff,#e8e4ff);border-color:#c8d9ff}.tc-bubble-sender{font-size:10px;color:#3b63a8;font-weight:900;margin-bottom:4px}.tc-bubble-text{white-space:pre-wrap;word-break:break-word;font-size:13px;line-height:1.45}.tc-bubble-time{font-size:9px;color:#8794aa;text-align:right;margin-top:4px}.tc-bubble-file{display:flex;align-items:center;gap:8px;padding:8px;background:#f3f7ff;border-radius:10px;text-decoration:none;color:#173b8f;font-weight:800;font-size:12px}
+  .tc-chat-compose{background:#fff;border-top:1px solid #e3eaf5;padding:10px 14px;display:flex;gap:8px;align-items:center}.tc-chat-compose textarea{flex:1;resize:none;border:1px solid #d9e3f3;border-radius:13px;padding:11px 13px;min-height:42px;max-height:120px;outline:none}.tc-chat-compose button{width:42px;height:42px;border:0;border-radius:12px;background:#eef4ff;color:#173b8f;cursor:pointer}.tc-chat-send{background:linear-gradient(135deg,#168cff,#4a3cff)!important;color:#fff!important}.tc-emoji-menu{position:absolute;bottom:65px;left:14px;background:#fff;border:1px solid #dbe4f2;box-shadow:0 15px 35px rgba(0,0,0,.12);border-radius:14px;padding:8px;display:none;grid-template-columns:repeat(8,30px);gap:4px;z-index:5}.tc-emoji-menu button{background:#fff!important;color:#222!important;font-size:20px!important;width:30px!important;height:30px!important}.tc-chat-compose-wrap{position:relative;display:flex;gap:8px;flex:1}.tc-chat-compose-wrap textarea{width:100%}
+  .tc-chat-modal{position:fixed;inset:0;background:rgba(7,20,52,.45);display:none;align-items:center;justify-content:center;z-index:10050}.tc-chat-modal.open{display:flex}.tc-chat-dialog{width:min(560px,94vw);background:#fff;border-radius:18px;padding:20px;box-shadow:0 30px 80px rgba(0,0,0,.25)}.tc-chat-dialog h3{margin:0 0 14px;color:#102a62}.tc-chat-people{max-height:300px;overflow:auto;border:1px solid #e3eaf5;border-radius:12px}.tc-chat-person{display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid #eef2f8}.tc-chat-person:last-child{border-bottom:0}.tc-chat-person input{accent-color:#3f37ff}.tc-chat-dialog input[type=text]{width:100%;box-sizing:border-box;padding:11px;border:1px solid #dbe4f2;border-radius:10px;margin-bottom:12px}.tc-chat-dialog-footer{display:flex;justify-content:flex-end;gap:8px;margin-top:15px}.tc-chat-dialog-footer button{border:0;border-radius:10px;padding:10px 15px;font-weight:800;cursor:pointer}.tc-chat-primary{background:linear-gradient(135deg,#168cff,#4a3cff);color:#fff}.tc-chat-secondary{background:#eef3fa;color:#173b8f}
+  .tc-chat-drop{font-size:10px;color:#7d8da8;margin-left:4px}.tc-chat-mobile-back{display:none}
+  @media(max-width:800px){.tc-chat-shell{grid-template-columns:1fr}.tc-chat-sidebar{display:none}.tc-chat-shell.list-open .tc-chat-sidebar{display:flex}.tc-chat-shell.list-open .tc-chat-main{display:none}.tc-chat-mobile-back{display:inline-block}.tc-bubble{max-width:82%}}
+  `;document.head.appendChild(css);
+  const page=document.createElement('div');page.id='tcChatPage';page.className='modal-page';page.innerHTML=`
+    <div class="tc-chat-shell" id="tcChatShell">
+      <aside class="tc-chat-sidebar">
+        <div class="tc-chat-brand"><i class="fas fa-comments"></i><span>Team Chat</span><button class="tc-chat-new" onclick="TC_CHAT_UI.openNew()" title="New chat" style="margin-left:auto">＋</button></div>
+        <div class="tc-chat-search"><input id="tcChatSearch" placeholder="Search people or chats..." oninput="TC_CHAT_UI.search(this.value)"></div>
+        <div class="tc-chat-list" id="tcChatList"></div>
+      </aside>
+      <main class="tc-chat-main">
+        <header class="tc-chat-head"><div class="tc-chat-head-user"><button class="tc-chat-actions tc-chat-mobile-back" onclick="TC_CHAT_UI.mobileBack()">‹</button><div class="tc-chat-avatar" id="tcChatHeadAvatar">C</div><div><h3 id="tcChatHeadName">Select a chat</h3><small id="tcChatHeadSub">Your team conversation</small></div></div><div class="tc-chat-actions"><button onclick="TC_CHAT_UI.openNew()"><i class="fas fa-user-plus"></i></button><button onclick="TC_CHAT_UI.refresh()"><i class="fas fa-rotate"></i></button></div></header>
+        <section class="tc-chat-messages" id="tcChatMessages"><div class="tc-chat-empty"><i class="fas fa-comments" style="font-size:42px;color:#9db4df"></i><h3>Team Chat</h3><p>Start a conversation with your team.</p></div></section>
+        <div class="tc-chat-compose" id="tcChatCompose" style="display:none"><div class="tc-chat-compose-wrap"><div class="tc-emoji-menu" id="tcEmojiMenu"></div><button onclick="TC_CHAT_UI.toggleEmoji()">😊</button><textarea id="tcChatInput" placeholder="Type a message..." onkeydown="TC_CHAT_UI.key(event)"></textarea></div><input id="tcChatFile" type="file" hidden onchange="TC_CHAT_UI.attach(this)"><button onclick="document.getElementById('tcChatFile').click()"><i class="fas fa-paperclip"></i></button><button class="tc-chat-send" onclick="TC_CHAT_UI.send()"><i class="fas fa-paper-plane"></i></button></div>
+      </main>
+    </div>`;
+  document.querySelector('main')?.appendChild(page) || document.body.appendChild(page);
+
+  const modal=document.createElement('div');modal.id='tcChatModal';modal.className='tc-chat-modal';modal.innerHTML=`<div class="tc-chat-dialog"><h3>New Chat</h3><div style="display:flex;gap:8px;margin-bottom:12px"><button class="tc-chat-primary" onclick="TC_CHAT_UI.openDirectMode()">Direct Chat</button><button class="tc-chat-secondary" onclick="TC_CHAT_UI.openGroupMode()">Create Group</button></div><div id="tcChatDialogBody"></div><div class="tc-chat-dialog-footer"><button class="tc-chat-secondary" onclick="TC_CHAT_UI.closeModal()">Cancel</button><button class="tc-chat-primary" onclick="TC_CHAT_UI.create()">Create / Open</button></div></div>`;document.body.appendChild(modal);
+  buildEmoji();
+}
+
+function buildEmoji(){const m=document.getElementById('tcEmojiMenu');if(!m)return;['😀','😂','😍','👍','👏','🙏','🔥','🎉','❤️','😊','😎','🤝','💯','✅','❌','📌','🚀','💡','👀','🙌','😄','😢','😡','🎯'].forEach(e=>{const b=document.createElement('button');b.textContent=e;b.onclick=()=>{const i=document.getElementById('tcChatInput');i.value+=(i.value?' ':'')+e;i.focus();m.style.display='none'};m.appendChild(b)});}
+
+async function loadConversations(){if(!chatLogin())return;try{const r=await chatCall('chat_list_conversations',{p_employee_id:chatLogin(),p_session_token:getSessionToken()});if(r.ok===false)throw new Error(r.message||'Chat unavailable');CHAT.conversations=r.conversations||[];CHAT.unread=CHAT.conversations.reduce((n,c)=>n+Number(c.unread||0),0);renderConversationList();updateChatBadge();}catch(e){console.warn('CHAT LIST',e);renderConversationList(e.message);}}
+function renderConversationList(err){const el=document.getElementById('tcChatList');if(!el)return;if(err&&!CHAT.conversations.length){el.innerHTML=`<div style="padding:20px;color:#ffd0d0;font-size:12px">${cEsc(err)}<br><small>Run CHAT_SCHEMA.sql in Supabase.</small></div>`;return}el.innerHTML=CHAT.conversations.map(c=>`<div class="tc-chat-item ${c.id===CHAT.activeId?'active':''}" onclick="TC_CHAT_UI.open('${c.id}')"><div class="tc-chat-avatar">${chatAvatar(c.name,c.photo)}</div><div class="tc-chat-meta"><div class="tc-chat-meta-top"><span class="tc-chat-name">${cEsc(c.name||'Chat')}</span><span class="tc-chat-time">${c.lastAt?chatTime(c.lastAt):''}</span></div><div class="tc-chat-preview">${cEsc(c.lastMessage||'Start chatting')}</div></div>${Number(c.unread)>0?`<span class="tc-chat-badge">${Number(c.unread)>99?'99+':c.unread}</span>`:''}</div>`).join('')||'<div style="padding:22px;color:#c1cce5;text-align:center">No chats yet.<br>Tap ＋ to start one.</div>';}
+function updateChatBadge(){const items=document.querySelectorAll('[data-tc-chat-badge]');items.forEach(x=>{x.textContent=CHAT.unread?String(CHAT.unread):'';x.style.display=CHAT.unread?'inline-grid':'none'});}
+
+async function openConversation(id){CHAT.activeId=id;const c=CHAT.conversations.find(x=>x.id===id);document.getElementById('tcChatHeadName').textContent=c?.name||'Chat';document.getElementById('tcChatHeadSub').textContent=c?.kind==='group'?'Group conversation':'Team member';document.getElementById('tcChatHeadAvatar').innerHTML=chatAvatar(c?.name||'C',c?.photo);document.getElementById('tcChatCompose').style.display='flex';document.getElementById('tcChatShell').classList.remove('list-open');try{const r=await chatCall('chat_get_messages',{p_employee_id:chatLogin(),p_conversation_id:id,p_session_token:getSessionToken()});if(r.ok===false)throw new Error(r.message);CHAT.messages=r.messages||[];renderMessages();await chatCall('chat_mark_read',{p_employee_id:chatLogin(),p_conversation_id:id,p_session_token:getSessionToken()});const c2=CHAT.conversations.find(x=>x.id===id);if(c2)c2.unread=0;CHAT.unread=CHAT.conversations.reduce((n,x)=>n+Number(x.unread||0),0);renderConversationList();updateChatBadge();}catch(e){toast('Chat load failed: '+(e.message||e));}}
+function renderMessages(){const el=document.getElementById('tcChatMessages');if(!el)return;if(!CHAT.messages.length){el.innerHTML='<div class="tc-chat-empty"><i class="fas fa-message" style="font-size:38px;color:#9db4df"></i><p>No messages yet. Say hello 👋</p></div>';return}el.innerHTML=CHAT.messages.map(m=>{const mine=String(m.senderId)===String(chatMeId());const deleted=!!m.deletedAt;return `<div class="tc-bubble-row ${mine?'mine':''}"><div class="tc-bubble">${!mine&&CHAT.conversations.find(c=>c.id===CHAT.activeId)?.kind==='group'?`<div class="tc-bubble-sender">${cEsc(m.senderName)}</div>`:''}${deleted?'<div style="font-style:italic;color:#8b96aa">Message deleted</div>':`${m.body?`<div class="tc-bubble-text">${cEsc(m.body)}</div>`:''}${m.attachmentUrl?`<a class="tc-bubble-file" href="${cEsc(m.attachmentUrl)}" target="_blank" rel="noopener"><i class="fas fa-paperclip"></i>${cEsc(m.attachmentName||'Attachment')}</a>`:''}`}<div class="tc-bubble-time">${chatTime(m.createdAt)}${m.editedAt?' · edited':''}${mine?' ✓':''}</div></div></div>`}).join('');el.scrollTop=el.scrollHeight;}
+
+async function sendMessage(){if(!CHAT.activeId)return;const input=document.getElementById('tcChatInput'),text=input.value.trim();const file=document.getElementById('tcChatFile').files[0];if(!text&&!file)return;try{let url=null,name=null,type='text';if(file){if(file.size>10*1024*1024)throw new Error('File must be 10 MB or smaller.');const safe=file.name.replace(/[^a-zA-Z0-9._-]/g,'_');const path=`${chatLogin()}/${Date.now()}-${safe}`;const up=await supabaseClient.storage.from('chat-attachments').upload(path,file,{upsert:false,contentType:file.type||undefined});if(up.error)throw sbError(up.error);url=supabaseClient.storage.from('chat-attachments').getPublicUrl(path).data.publicUrl;name=file.name;type=file.type?.startsWith('image/')?'image':'file';}const r=await chatCall('chat_send_message',{p_employee_id:chatLogin(),p_conversation_id:CHAT.activeId,p_body:text,p_message_type:type,p_attachment_url:url,p_attachment_name:name,p_reply_to:null,p_session_token:getSessionToken()});if(r.ok===false)throw new Error(r.message);input.value='';document.getElementById('tcChatFile').value='';CHAT.messages.push(r.message);renderMessages();await loadConversations();}catch(e){toast('Message failed: '+(e.message||e));}}
+
+async function createOrOpen(){const mode=TC_CHAT_UI.mode||'direct';const selected=[...document.querySelectorAll('#tcChatPeople input:checked')].map(x=>x.value);try{let r;if(mode==='direct'){if(selected.length!==1)throw new Error('Select one team member.');r=await chatCall('chat_open_direct',{p_employee_id:chatLogin(),p_other_employee_id:selected[0],p_session_token:getSessionToken()});}else{const name=document.getElementById('tcChatGroupName').value.trim();if(!name)throw new Error('Enter group name.');if(!selected.length)throw new Error('Select at least one member.');r=await chatCall('chat_create_group',{p_employee_id:chatLogin(),p_name:name,p_member_ids:selected,p_session_token:getSessionToken()});}if(r.ok===false)throw new Error(r.message);closeModal();await loadConversations();await openConversation(r.conversationId);}catch(e){toast(e.message||String(e));}}
+async function openNewModal(){TC_CHAT_UI.mode='direct';document.getElementById('tcChatModal').classList.add('open');renderPeopleDialog();}
+async function renderPeopleDialog(q=''){const body=document.getElementById('tcChatDialogBody');body.innerHTML='<div style="padding:20px;text-align:center;color:#8291aa">Loading...</div>';const r=await chatCall('chat_search_people',{p_employee_id:chatLogin(),p_query:q});const people=r.people||[];body.innerHTML=`${TC_CHAT_UI.mode==='group'?'<input id="tcChatGroupName" type="text" placeholder="Group name">':''}<div class="tc-chat-people" id="tcChatPeople">${people.map(p=>`<label class="tc-chat-person"><input type="checkbox" value="${cEsc(p.id)}"><div class="tc-chat-avatar" style="width:34px;height:34px;flex-basis:34px">${chatAvatar(p.name,p.photo)}</div><div><b>${cEsc(p.name)}</b><div style="font-size:11px;color:#8190ad">${cEsc(p.department||p.role||'Team member')}</div></div></label>`).join('')||'<div style="padding:20px;color:#8190ad">No team members found.</div>'}</div>`;}
+function switchChatMode(mode){TC_CHAT_UI.mode=mode;renderPeopleDialog();}
+function searchPeople(q){clearTimeout(CHAT.searchTimer);CHAT.searchTimer=setTimeout(()=>{if(document.getElementById('tcChatModal').classList.contains('open'))renderPeopleDialog(q);else filterChats(q)},250);}
+function filterChats(q){q=String(q||'').toLowerCase();document.querySelectorAll('.tc-chat-item').forEach(x=>x.style.display=x.textContent.toLowerCase().includes(q)?'flex':'none');}
+async function poll(){if(!APP.currentUser)return;try{const r=await chatCall('chat_poll',{p_employee_id:chatLogin(),p_since:CHAT.lastPoll,p_session_token:getSessionToken()});CHAT.lastPoll=new Date().toISOString();const msgs=r.messages||[];for(const m of msgs){if(!CHAT.activeId||m.conversationId!==CHAT.activeId){notifyChat(m);}else{CHAT.messages.push(m);renderMessages();await chatCall('chat_mark_read',{p_employee_id:chatLogin(),p_conversation_id:m.conversationId,p_session_token:getSessionToken()});}}if(msgs.length)await loadConversations();}catch(e){console.warn('CHAT POLL',e);}}
+function notifyChat(m){const title=m.senderName||'New message';const body=m.body||'Sent an attachment';try{toast(`${title}: ${body}`);}catch(_){}if('Notification' in window){if(Notification.permission==='granted')new Notification(title,{body,icon:APP.currentUser?.profile_photo_url||undefined,tag:'task-command-chat'});}}
+function startPolling(){clearInterval(CHAT.pollTimer);CHAT.lastPoll=new Date().toISOString();CHAT.pollTimer=setInterval(poll,2500);}
+function requestChatNotifications(){if('Notification' in window&&Notification.permission==='default')Notification.requestPermission().catch(()=>{});}
+
+const TC_CHAT_UI={
+  open:openConversation,refresh:loadConversations,mobileBack:()=>document.getElementById('tcChatShell').classList.add('list-open'),
+  search:searchPeople,key:e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMessage();}},send:sendMessage,attach:f=>{if(f.files[0])toast('Attachment ready: '+f.files[0].name);},toggleEmoji:()=>{const x=document.getElementById('tcEmojiMenu');x.style.display=x.style.display==='grid'?'none':'grid'},openNew:openNewModal,closeModal:()=>document.getElementById('tcChatModal').classList.remove('open'),openDirectMode:()=>switchChatMode('direct'),openGroupMode:()=>switchChatMode('group'),create:createOrOpen,mode:'direct'
+};
+window.TC_CHAT_UI=TC_CHAT_UI;
+
+function addChatNav(){const nav=[...document.querySelectorAll('.nav-item')].find(x=>/Announcements/i.test(x.textContent||''));if(!nav||document.getElementById('tcChatNav'))return;const li=document.createElement('li');li.id='tcChatNav';li.className='nav-item';li.innerHTML='<i class="fas fa-comments"></i> Team Chat <span data-tc-chat-badge class="tc-chat-badge" style="display:none;margin-left:auto;background:#35d17d"></span>';li.onclick=function(){openChatPage(li)};nav.parentNode.insertBefore(li,nav.nextSibling);}
+async function openChatPage(el){injectChatUI();document.querySelectorAll('.nav-item').forEach(x=>x.classList.remove('active'));el?.classList.add('active');document.querySelectorAll('.modal-page').forEach(x=>x.classList.remove('active'));document.getElementById('tcChatPage').classList.add('tc-chat-active');requestChatNotifications();await loadConversations();startPolling();}
+window.openTaskCommandChat=openChatPage;
+
+function bootChat(){injectChatUI();addChatNav();if(APP.currentUser){startPolling();}}
+window.addEventListener('load',()=>setTimeout(bootChat,700));
+const oldShowPage=window.showPage;
+window.showPage=function(id){if(id!=='tcChatPage'){document.getElementById('tcChatPage')?.classList.remove('tc-chat-active');}if(oldShowPage)oldShowPage.apply(this,arguments);};
+const oldLoadData=window.loadData;
+if(typeof oldLoadData==='function')window.loadData=async function(){const r=await oldLoadData.apply(this,arguments);try{addChatNav();if(document.getElementById('tcChatPage')?.classList.contains('tc-chat-active'))loadConversations();}catch(_){}return r;};
+
+})();
+
+/* =========================================================
+   TASK COMMAND - CHAT THEME / EMOJI ENHANCEMENT
+   Additive only: does not replace the existing dashboard logic.
+   ========================================================= */
+(function(){
+'use strict';
+const TC_CHAT_THEME_KEY='taskCommandChatTheme';
+const TC_EMOJIS=['😀','😂','😊','😍','👍','👏','🙏','🔥','🎉','❤️','💯','✅','😄','😎','🤝','🙌','📌','📎','🚀','⭐','🎯','💡','👋','😅','🤔','😉','🥳','😇','💪','✨','📢','📅'];
+function chatThemeStyle(){
+  if(document.getElementById('tcChatThemeCss')) return;
+  const s=document.createElement('style');s.id='tcChatThemeCss';s.textContent=`
+  #tcChatPage.tc-chat-dark{background:#0b141a}
+  #tcChatPage.tc-chat-dark .tc-chat-shell{background:#111b21;border-color:#27343b;box-shadow:0 20px 55px rgba(0,0,0,.35)}
+  #tcChatPage.tc-chat-dark .tc-chat-main{background:#0b141a}
+  #tcChatPage.tc-chat-dark .tc-chat-head{background:#202c33;border-color:#334047}
+  #tcChatPage.tc-chat-dark .tc-chat-head h3{color:#e9edef}
+  #tcChatPage.tc-chat-dark .tc-chat-head small{color:#aebac1}
+  #tcChatPage.tc-chat-dark .tc-chat-messages{background:radial-gradient(circle at 20% 20%,rgba(35,126,115,.08),transparent 28%),#0b141a}
+  #tcChatPage.tc-chat-dark .tc-bubble{background:#202c33;border-color:#2b3a42;color:#e9edef;box-shadow:none}
+  #tcChatPage.tc-chat-dark .tc-bubble-row.mine .tc-bubble{background:#005c4b;border-color:#006b59;color:#e9edef}
+  #tcChatPage.tc-chat-dark .tc-bubble-time{color:#9aa7ae}
+  #tcChatPage.tc-chat-dark .tc-bubble-file{background:#17262d;color:#8ed9ff}
+  #tcChatPage.tc-chat-dark .tc-chat-compose{background:#202c33;border-color:#334047}
+  #tcChatPage.tc-chat-dark .tc-chat-compose textarea{background:#2a3941;color:#e9edef;border-color:#3a4a53}
+  #tcChatPage.tc-chat-dark .tc-chat-compose textarea::placeholder{color:#aebac1}
+  #tcChatPage.tc-chat-dark .tc-chat-actions button,#tcChatPage.tc-chat-dark .tc-chat-new{background:#2a3941;color:#d8e4ea}
+  #tcChatPage.tc-chat-dark .tc-chat-modal{background:rgba(0,0,0,.72)}
+  #tcChatPage.tc-chat-dark .tc-chat-dialog{background:#202c33;color:#e9edef}
+  #tcChatPage.tc-chat-dark .tc-chat-dialog h3{color:#e9edef}
+  #tcChatPage.tc-chat-dark .tc-chat-person{border-color:#334047}
+  #tcChatPage.tc-chat-dark .tc-chat-person b{color:#e9edef}
+  #tcChatPage.tc-chat-dark .tc-chat-dialog input[type=text]{background:#2a3941;color:#e9edef;border-color:#3a4a53}
+  #tcChatPage.tc-chat-dark .tc-emoji-menu{background:#202c33;border-color:#3a4a53}
+  #tcChatPage.tc-chat-dark .tc-emoji-menu button{background:#202c33!important;color:#fff!important}
+  .tc-chat-theme-btn{min-width:42px}
+  `;document.head.appendChild(s);
+}
+function applyTheme(theme){const page=document.getElementById('tcChatPage');if(!page)return;page.classList.toggle('tc-chat-dark',theme==='dark');localStorage.setItem(TC_CHAT_THEME_KEY,theme);const b=document.getElementById('tcChatThemeToggle');if(b){b.title=theme==='dark'?'Switch to light mode':'Switch to dark mode';b.innerHTML=theme==='dark'?'<i class="fas fa-sun"></i>':'<i class="fas fa-moon"></i>';}}
+function fillEmoji(){const box=document.getElementById('tcEmojiMenu');if(!box||box.dataset.ready==='1')return;box.innerHTML=TC_EMOJIS.map(e=>`<button type="button" onclick="TC_CHAT_EMOJI('${e}')">${e}</button>`).join('');box.dataset.ready='1';}
+window.TC_CHAT_EMOJI=function(e){const input=document.getElementById('tcChatInput');if(!input)return;const start=input.selectionStart||input.value.length,end=input.selectionEnd||input.value.length;input.value=input.value.slice(0,start)+e+input.value.slice(end);input.focus();input.selectionStart=input.selectionEnd=start+e.length;document.getElementById('tcEmojiMenu')?.style.setProperty('display','none');};
+function enhance(){const page=document.getElementById('tcChatPage');if(!page)return false;chatThemeStyle();fillEmoji();if(!document.getElementById('tcChatThemeToggle')){const actions=page.querySelector('.tc-chat-head .tc-chat-actions');if(actions){const b=document.createElement('button');b.id='tcChatThemeToggle';b.className='tc-chat-theme-btn';b.type='button';b.onclick=()=>applyTheme(page.classList.contains('tc-chat-dark')?'light':'dark');actions.insertBefore(b,actions.firstChild);}}applyTheme(localStorage.getItem(TC_CHAT_THEME_KEY)||'light');return true;}
+let tries=0;const timer=setInterval(()=>{tries++;if(enhance()||tries>40)clearInterval(timer);},250);window.addEventListener('load',()=>setTimeout(enhance,500));
+const oldOpen=window.openTaskCommandChat;if(typeof oldOpen==='function'){window.openTaskCommandChat=function(){const r=oldOpen.apply(this,arguments);setTimeout(enhance,150);return r;};}
 })();
